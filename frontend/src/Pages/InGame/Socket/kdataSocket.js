@@ -1,5 +1,3 @@
-// src/Pages/InGame/Socket/kdataSocket.js
-
 import { getSocket } from './mainSocket';
 
 export function sendWordToServer({ user, word, itemUsed }) {
@@ -11,10 +9,9 @@ export function sendWordToServer({ user, word, itemUsed }) {
 
   const payload = {
     action: "submit_word",
-    user,
-    current_word: word,
-    itemUsed: itemUsed || false,
+    word, 
   };
+  
 
   socket.send(JSON.stringify(payload));
   console.log('✅ 서버에 단어 전송:', payload);

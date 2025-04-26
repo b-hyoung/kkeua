@@ -12,11 +12,9 @@ import useGameRoomSocket from '../../hooks/useGameRoomSocket';
 import userIsTrue from '../../Component/userIsTrue';
 import guestStore from '../../store/guestStore';
 
-import { connectSocket, getSocket } from './Socket/mainSocket';
-import { sendWordChainMessage as originalSendWordChainMessage } from './Socket/mainSocket';
+import { connectSocket, getSocket, setReceiveWordHandler } from './Socket/mainSocket';
+
 import { sendWordToServer } from './Socket/kdataSocket';
-
-
 
 const time_gauge = 40;
 
@@ -25,13 +23,6 @@ function InGame() {
   const [quizMsg, setQuizMsg] = useState('햄');
   const { gameid } = useParams();
   const navigate = useNavigate();
-
-  const [sentMessages, setSentMessages] = useState([]);
-
-  function sendWordChainMessageAndLog(word = '') {
-    originalSendWordChainMessage(word);
-    setSentMessages(prev => [...prev, { word, timestamp: new Date().toISOString() }]);
-  }
 
   // 퀴즈 제시어 
 
@@ -54,6 +45,17 @@ function InGame() {
       setQuizMsg(randomWord);
     }
   };
+
+  useEffect(() => {
+    // 단어 수신 핸들러 등록
+    setReceiveWordHandler((data) => {
+      console.log("💬 서버에서 단어 수신:", data);
+      if (data && data.word) {
+        setTypingText(data.word);  // 이건 예시야. 너 흐름에 맞게 사용해야 해.
+        setPendingItem({ word: data.word });
+      }
+    });
+  }, []);
 
   useEffect(() => {
     setRandomQuizWord();
@@ -112,6 +114,10 @@ function InGame() {
     setQuizMsg
   });
 
+  const [usedWords, setUsedWords] = useState([]);
+  const [currentPlayer, setCurrentPlayer] = useState(null);
+  const [lastCharacter, setLastCharacter] = useState('');
+  
   useEffect(() => {
     async function prepareGuestAndConnect() {
       try {
@@ -119,125 +125,74 @@ function InGame() {
           .split('; ')
           .find(row => row.startsWith('kkua_guest_uuid='))
           ?.split('=')[1];
-
+  
         if (!guestUuid) {
-          console.log("✅ 게스트 UUID 없음 -> 로그인 요청");
           const loginRes = await axiosInstance.post('/guests/login');
           guestUuid = loginRes.data.uuid;
-
-          // 수동으로 쿠키 저장 (테스트용. 서버가 Set-Cookie 하면 생략)
           document.cookie = `kkua_guest_uuid=${guestUuid}; path=/`;
         }
-
-        console.log("✅ 게스트 인증 성공, 방 입장 시도");
-
-        console.log("✅ 방 입장 성공, 소켓 연결 시도");
+  
         connectSocket(gameid);
-
+  
+        const socket = getSocket();
+        if (socket) {
+          socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            console.log('📨 수신 데이터:', data);
+  
+            if (data.type === "word_chain_state") {
+              console.log('✅ word_chain_state 수신:', data);
+              setUsedWords(data.words_used || []);
+              setCurrentPlayer(data.current_player || null);
+              setLastCharacter(data.last_character || '');
+            }
+  
+            if (data.type === "word_chain_word_submitted") {
+              console.log('✅ word_chain_word_submitted 수신:', data);
+              setUsedWords(prev => [...prev, data.word]);
+              setCurrentPlayer(data.next_player);
+              setLastCharacter(data.last_character);
+            }
+          };
+        }
+  
       } catch (error) {
-        console.error("❌ 준비 실패:", error);
-        alert("방 입장 실패 또는 서버 연결 실패ㅁㅁㅁ");
+        console.error("❌ 방 입장 또는 소켓 연결 실패:", error.response?.data || error.message);
+        alert("방 입장 실패 또는 서버 연결 실패");
+        navigate("/");
       }
     }
-
+  
     if (gameid) {
       prepareGuestAndConnect();
     }
   }, [gameid, navigate]);
-
-  useEffect(() => {
-    const socket = getSocket();
-    if (!socket) return;
-
-    const handleSocketMessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (!data.type) return;
-
-      switch (data.type) {
-        case 'connected':
-          console.log('✅ 연결 완료 (서버 등록 완료):', data);
-          break;
-        case 'game_started':
-          console.log('🎮 게임 시작됨');
-          resetTimer();
-          setRandomQuizWord();
-          break;
-        case 'word_accepted':
-          console.log('✅ [word_accepted] 서버로부터 받은 데이터:', data);
-          if (data.word) {
-            const word = data.word;
-            setQuizMsg(word.charAt(word.length - 1));
-            setUsedLog(prev => (!prev.includes(word) ? [...prev, word] : prev));
-            setItemList(prev => {
-              if (!prev.find(item => item.word === word)) {
-                return [...prev, { word: word, desc: `${word}가 등록되었습니다.` }];
-              }
-              return prev;
-            });
-            setSpecialPlayer(prev => {
-              const currentIndex = socketParticipants.map(p => p.nickname).indexOf(prev);
-              const nextIndex = (currentIndex + 1) % socketParticipants.length;
-              return socketParticipants[nextIndex]?.nickname || prev;
-            });
-            setSentMessages(prev => [...prev, {
-              result: '성공',
-              word: data.word,
-              timestamp: new Date().toISOString()
-            }]);
-          }
-          break;
-        case 'word_rejected':
-          if (data.reason) {
-            setMessage(`❌ 단어 거절: ${data.reason}`);
-          } else {
-            setMessage('❌ 단어가 거절되었습니다.');
-          }
-          if (data.word) {
-            setSentMessages(prev => [...prev, {
-              result: '실패',
-              word: data.word,
-              timestamp: new Date().toISOString()
-            }]);
-          }
-          break;
-        case 'game_over':
-          break;
-        default:
-          console.warn('Unknown message type:', data.type);
-      }
-    };
-
-    socket.addEventListener('message', handleSocketMessage);
-
-    return () => {
-      socket.removeEventListener('message', handleSocketMessage);
-    };
-  }, [gameid, navigate, socketParticipants]);
+  
 
   // 나머지 게임 로직은 기존 그대로 ↓↓↓
-
 
   const handleTypingDone = () => {
     if (!pendingItem) return;
 
-    sendWordChainMessageAndLog(pendingItem.word);
+    setUsedLog(prev => (!prev.includes(pendingItem.word) ? [...prev, pendingItem.word] : prev));
+    setItemList(prev => (!prev.find(item => item.word === pendingItem.word) ? [...prev, pendingItem] : prev));
+    setQuizMsg(pendingItem.word.charAt(pendingItem.word.length - 1));
+
+    setSpecialPlayer(prev => {
+      const currentIndex = socketParticipants.map(p => p.nickname).indexOf(prev);
+      return socketParticipants.map(p => p.nickname)[(currentIndex + 1) % socketParticipants.length];
+    });
+
+    sendWordToServer({
+      user: specialPlayer,
+      word: pendingItem.word,
+      itemUsed: false,
+    });
 
     setTypingText('');
     setPendingItem(null);
     setInputTimeLeft(12);
     setCatActive(true);
-  };
-
-  const sendCustomBroadcast = (content) => {
-    const socket = getSocket();
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(JSON.stringify({
-        type: "custom_broadcast",
-        content: content
-      }));
-    } else {
-      console.error("WebSocket이 열려있지 않아 broadcast를 보낼 수 없습니다.");
-    }
   };
 
   useEffect(() => {
