@@ -379,12 +379,18 @@ async def process_word_chain_message(
         
         # 첫 글자 검증
         last_char = game_state.get("last_character", "")
-        if word[0] != last_char:
+        words_used = game_state.get("words_used", [])
+        
+        # 첫 단어인 경우 첫 글자 검증 스킵
+        if not words_used:
+            # 첫 단어는 아무 단어나 가능
+            pass
+        elif word[0] != last_char:
             is_valid = False
             message = f"'{last_char}'로 시작하는 단어를 입력해야 합니다."
         
         # 사용된 단어 검증
-        elif word in game_state.get("words_used", []):
+        elif word in words_used:
             is_valid = False
             message = "이미 사용된 단어입니다."
         
@@ -396,14 +402,46 @@ async def process_word_chain_message(
         # 단어 뜻 생성 (임시)
         word_meaning = f"'{word}'의 임시 의미: {word}(은)는 한국어 단어입니다."
         
-        # 검증 결과 전송 (뜻 포함)
-        await ws_manager.send_personal_message({
+        # 유저 정보 가져오기
+        user_info = ws_manager.get_connection_user_info(websocket)
+        nickname = user_info.get("nickname", "플레이어") if user_info else "플레이어"
+        guest_id = user_info.get("guest_id") if user_info else None
+        
+        # 검증 결과를 모든 참가자에게 브로드캐스트
+        validation_result = {
             "type": "word_validation_result",
             "valid": is_valid,
             "message": message,
             "word": word,
-            "meaning": word_meaning
-        }, websocket)
+            "meaning": word_meaning,
+            "submitted_by": {
+                "nickname": nickname,
+                "guest_id": guest_id
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # 모든 참가자에게 결과 브로드캐스트
+        await ws_manager.broadcast_to_room(room_id, validation_result)
+        
+        # 유효한 단어인 경우 게임 상태 업데이트
+        if is_valid:
+            # 사용된 단어 목록에 추가
+            if "words_used" not in game_state:
+                game_state["words_used"] = []
+            game_state["words_used"].append(word)
+            
+            # 마지막 글자 업데이트
+            game_state["last_character"] = word[-1]
+            
+            # 마지막 제출자 정보 업데이트
+            game_state["last_player"] = {
+                "nickname": nickname,
+                "guest_id": guest_id
+            }
+            
+            # 게임 상태 업데이트
+            ws_manager.update_game_state(room_id, game_state)
 
 @router.websocket("/{room_id}/{guest_uuid}")
 async def websocket_endpoint(
