@@ -34,6 +34,16 @@ function Layout({
   reactionTimes, // Added reactionTimes prop
   handleClickFinish // <-- Add this line
 }) {
+  useEffect(() => {
+    window.setInputTimeLeftFromSocket = (time) => {
+      setInputTimeLeft(time);
+    };
+
+    return () => {
+      delete window.setInputTimeLeftFromSocket;
+    };
+  }, []);
+
   const [showEndPointModal, setShowEndPointModal] = useState(false);
   const [catRun, setCatRun] = useState(false);
 
@@ -178,18 +188,18 @@ function Layout({
           {/* 게이지 bar */}
           <div className={`relative h-1.5 w-full bg-gray-200`}>
             <div
-              className={`absolute top-0 left-0 h-full ${inputTimeLeft <= 3 ? 'bg-red-400' : 'bg-orange-400'} rounded-r-full ${inputTimeLeft === 12 ? '' : 'transition-all duration-1000'}`}
+              className={`absolute top-0 left-0 h-full ${inputTimeLeft <= 3 ? 'bg-red-400' : 'bg-orange-400'} rounded-r-full ${inputTimeLeft === 120 ? '' : 'transition-all duration-1000'}`}
               style={{
-                width: `${(inputTimeLeft / 12) * 100}%`,
-                transition: inputTimeLeft === 12 ? 'none' : 'width 1s linear',
+                width: `${(inputTimeLeft / 120) * 100}%`,
+                transition: inputTimeLeft === 120 ? 'none' : 'width 1s linear',
               }}
             ></div>
             <img
               src={workingCatImg}
               alt="고양이22"
-              className={`absolute top-1/2 w-6 h-6 z-10 ${inputTimeLeft === 12 ? '' : 'transition-[left] ease-linear duration-1000'}`}
+              className={`absolute top-1/2 w-6 h-6 z-10 ${inputTimeLeft === 120 ? '' : 'transition-[left] ease-linear duration-1000'}`}
               style={{
-                left: `${inputTimeLeft === 12 ? '100%' : (inputTimeLeft / 12) * 100 + '%'}`,
+                left: `${inputTimeLeft === 120 ? '100%' : (inputTimeLeft / 120) * 100 + '%'}`,
                 transform: 'translate(-50%, -50%)',
               }}
             />

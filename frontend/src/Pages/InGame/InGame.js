@@ -12,8 +12,10 @@ import useGameRoomSocket from '../../hooks/useGameRoomSocket';
 import userIsTrue from '../../Component/userIsTrue';
 import guestStore from '../../store/guestStore';
 
-import { connectSocket } from './Socket/mainSocket';
+import { connectSocket, getSocket } from './Socket/mainSocket';
+import { sendWordChainMessage as originalSendWordChainMessage } from './Socket/mainSocket';
 import { sendWordToServer } from './Socket/kdataSocket';
+
 
 
 const time_gauge = 40;
@@ -23,6 +25,13 @@ function InGame() {
   const [quizMsg, setQuizMsg] = useState('햄');
   const { gameid } = useParams();
   const navigate = useNavigate();
+
+  const [sentMessages, setSentMessages] = useState([]);
+
+  function sendWordChainMessageAndLog(word = '') {
+    originalSendWordChainMessage(word);
+    setSentMessages(prev => [...prev, { word, timestamp: new Date().toISOString() }]);
+  }
 
   // 퀴즈 제시어 
 
@@ -136,31 +145,99 @@ function InGame() {
     }
   }, [gameid, navigate]);
 
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleSocketMessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (!data.type) return;
+
+      switch (data.type) {
+        case 'connected':
+          console.log('✅ 연결 완료 (서버 등록 완료):', data);
+          break;
+        case 'game_started':
+          console.log('🎮 게임 시작됨');
+          resetTimer();
+          setRandomQuizWord();
+          break;
+        case 'word_accepted':
+          console.log('✅ [word_accepted] 서버로부터 받은 데이터:', data);
+          if (data.word) {
+            const word = data.word;
+            setQuizMsg(word.charAt(word.length - 1));
+            setUsedLog(prev => (!prev.includes(word) ? [...prev, word] : prev));
+            setItemList(prev => {
+              if (!prev.find(item => item.word === word)) {
+                return [...prev, { word: word, desc: `${word}가 등록되었습니다.` }];
+              }
+              return prev;
+            });
+            setSpecialPlayer(prev => {
+              const currentIndex = socketParticipants.map(p => p.nickname).indexOf(prev);
+              const nextIndex = (currentIndex + 1) % socketParticipants.length;
+              return socketParticipants[nextIndex]?.nickname || prev;
+            });
+            setSentMessages(prev => [...prev, {
+              result: '성공',
+              word: data.word,
+              timestamp: new Date().toISOString()
+            }]);
+          }
+          break;
+        case 'word_rejected':
+          if (data.reason) {
+            setMessage(`❌ 단어 거절: ${data.reason}`);
+          } else {
+            setMessage('❌ 단어가 거절되었습니다.');
+          }
+          if (data.word) {
+            setSentMessages(prev => [...prev, {
+              result: '실패',
+              word: data.word,
+              timestamp: new Date().toISOString()
+            }]);
+          }
+          break;
+        case 'game_over':
+          break;
+        default:
+          console.warn('Unknown message type:', data.type);
+      }
+    };
+
+    socket.addEventListener('message', handleSocketMessage);
+
+    return () => {
+      socket.removeEventListener('message', handleSocketMessage);
+    };
+  }, [gameid, navigate, socketParticipants]);
+
   // 나머지 게임 로직은 기존 그대로 ↓↓↓
 
 
   const handleTypingDone = () => {
     if (!pendingItem) return;
 
-    setUsedLog(prev => (!prev.includes(pendingItem.word) ? [...prev, pendingItem.word] : prev));
-    setItemList(prev => (!prev.find(item => item.word === pendingItem.word) ? [...prev, pendingItem] : prev));
-    setQuizMsg(pendingItem.word.charAt(pendingItem.word.length - 1));
-
-    setSpecialPlayer(prev => {
-      const currentIndex = socketParticipants.map(p => p.nickname).indexOf(prev);
-      return socketParticipants.map(p => p.nickname)[(currentIndex + 1) % socketParticipants.length];
-    });
-
-    sendWordToServer({
-      user: specialPlayer,
-      word: pendingItem.word,
-      itemUsed: false,
-    });
+    sendWordChainMessageAndLog(pendingItem.word);
 
     setTypingText('');
     setPendingItem(null);
     setInputTimeLeft(12);
     setCatActive(true);
+  };
+
+  const sendCustomBroadcast = (content) => {
+    const socket = getSocket();
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: "custom_broadcast",
+        content: content
+      }));
+    } else {
+      console.error("WebSocket이 열려있지 않아 broadcast를 보낼 수 없습니다.");
+    }
   };
 
   useEffect(() => {
@@ -232,22 +309,51 @@ function InGame() {
         catActive={catActive}
         frozenTime={frozenTime}
       />
+      <div className="w-full max-w-md mx-auto mt-4 p-2 bg-gray-100 rounded-lg shadow">
+        <h2 className="text-center font-bold mb-2">📤 전송한 메시지</h2>
+        <div className="space-y-1 max-h-[200px] overflow-y-auto">
+          {sentMessages.map((msg, index) => (
+            <div key={index} className="p-2 bg-white rounded shadow text-sm">
+              <div className={msg.result === '성공' ? 'text-green-500 font-bold' : 'text-red-500 font-bold'}>
+                📝 {msg.result} - {msg.word || 'N/A'}
+              </div>
+              <div className="text-xs text-gray-400">{new Date(msg.timestamp).toLocaleTimeString()}</div>
+            </div>
+          ))}
+        </div>
+      </div>
       {socketParticipants.length > 0 && (
         <div className="fixed bottom-4 left-4 z-50">
           {guestStore.getState().guest_id === socketParticipants.find(p => p.is_owner)?.guest_id ? (
-            <button
-              onClick={handleClickFinish}
-              className="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 transition"
-            >
-              게임 종료
-            </button>
+            <>
+              <button
+                onClick={handleClickFinish}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 transition"
+              >
+                게임 종료
+              </button>
+              <button
+                onClick={() => sendCustomBroadcast("🔥 긴급 브로드캐스트 테스트")}
+                className="bg-purple-500 text-white px-4 py-2 rounded-lg shadow hover:bg-purple-600 transition mt-2"
+              >
+                브로드캐스트 테스트
+              </button>
+            </>
           ) : (
-            <button
-              onClick={() => navigate(gameLobbyUrl(gameid))}
-              className="bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600 transition"
-            >
-              로비 이동
-            </button>
+            <>
+              <button
+                onClick={() => navigate(gameLobbyUrl(gameid))}
+                className="bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600 transition"
+              >
+                로비 이동
+              </button>
+              <button
+                onClick={() => sendCustomBroadcast("🔥 긴급 브로드캐스트 테스트")}
+                className="bg-purple-500 text-white px-4 py-2 rounded-lg shadow hover:bg-purple-600 transition mt-2"
+              >
+                브로드캐스트 테스트
+              </button>
+            </>
           )}
         </div>
       )}
