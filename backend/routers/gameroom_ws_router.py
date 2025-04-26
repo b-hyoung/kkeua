@@ -352,6 +352,59 @@ async def process_word_chain_message(
                 "message": "게임 종료에 실패했습니다."
             }, websocket)
 
+    # 추가: 단어 검증 기능
+    elif action == "validate_word":
+        word = message_data.get("word", "").strip()
+        if not word:
+            await ws_manager.send_personal_message({
+                "type": "word_validation_result",
+                "valid": False,
+                "message": "단어를 입력해주세요."
+            }, websocket)
+            return
+            
+        # 게임 상태 확인
+        game_state = ws_manager.get_game_state(room_id)
+        if not game_state or not game_state["started"]:
+            await ws_manager.send_personal_message({
+                "type": "word_validation_result",
+                "valid": False,
+                "message": "게임이 시작되지 않았습니다."
+            }, websocket)
+            return
+            
+        # 끝말잇기 규칙 검증
+        is_valid = True
+        message = "유효한 단어입니다."
+        
+        # 첫 글자 검증
+        last_char = game_state.get("last_character", "")
+        if word[0] != last_char:
+            is_valid = False
+            message = f"'{last_char}'로 시작하는 단어를 입력해야 합니다."
+        
+        # 사용된 단어 검증
+        elif word in game_state.get("words_used", []):
+            is_valid = False
+            message = "이미 사용된 단어입니다."
+        
+        # 최소 길이 검증
+        elif len(word) < 2:
+            is_valid = False
+            message = "단어는 2글자 이상이어야 합니다."
+        
+        # 단어 뜻 생성 (임시)
+        word_meaning = f"'{word}'의 임시 의미: {word}(은)는 한국어 단어입니다."
+        
+        # 검증 결과 전송 (뜻 포함)
+        await ws_manager.send_personal_message({
+            "type": "word_validation_result",
+            "valid": is_valid,
+            "message": message,
+            "word": word,
+            "meaning": word_meaning
+        }, websocket)
+
 @router.websocket("/{room_id}/{guest_uuid}")
 async def websocket_endpoint(
     websocket: WebSocket,

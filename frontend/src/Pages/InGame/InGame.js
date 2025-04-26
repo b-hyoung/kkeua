@@ -1,25 +1,30 @@
 import { useEffect, useState } from 'react';
-import TopMsgAni from './Section/TopMsg_Ani';
-import useTopMsg from './Section/TopMsg';
-import Layout from './Section/Layout';
-import Timer from './Section/Timer';
-import userIsTrue from '../../Component/userIsTrue';
 import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '../../Api/axiosInstance';
 import { ROOM_API } from '../../Api/roomApi';
-import { gameLobbyUrl, gameUrl } from '../../Component/urls';
+import { gameLobbyUrl } from '../../Component/urls';
+import Layout from './Section/Layout';
+import Timer from './Section/Timer';
+import useTopMsg from './Section/TopMsg';
+import TopMsgAni from './Section/TopMsg_Ani';
+
 import useGameRoomSocket from '../../hooks/useGameRoomSocket';
+import userIsTrue from '../../Component/userIsTrue';
 import guestStore from '../../store/guestStore';
+
+import { connectSocket } from './Socket/mainSocket';
+import { sendWordToServer } from './Socket/kdataSocket';
+
 
 const time_gauge = 40;
 
 function InGame() {
   const [itemList, setItemList] = useState([]);
+  const [quizMsg, setQuizMsg] = useState('햄');
+  const { gameid } = useParams();
+  const navigate = useNavigate();
 
   // 퀴즈 제시어 
-  const [quizMsg, setQuizMsg] = useState('햄'); // 초기 시작 단어
-
-  const {gameid} = useParams();
 
   const {
     participants: socketParticipants,
@@ -60,17 +65,19 @@ function InGame() {
   const [frozenTime, setFrozenTime] = useState(null);
   const [inputTimeLeft, setInputTimeLeft] = useState(12);
 
-  const { timeLeft, resetTimer } = Timer(120, () => {
-    setMessage('게임종료!');
-     // 3초 뒤 메시지 제거
-    setTimeout(() => {
-    setMessage('');
-  }, 3000);
-  });
+  const [timeLeft, setTimeLeft] = useState(120);
+  const resetTimer = () => setTimeLeft(120);
+
+  const [catActive, setCatActive] = useState(true);
+
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+    const interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+    return () => clearInterval(interval);
+  }, [timeLeft]);
 
   const [usedLog, setUsedLog] = useState([]);
   const [specialPlayer, setSpecialPlayer] = useState('부러');
-  const navigate = useNavigate()
 
   const [inputValue, setInputValue] = useState('');
   const [message, setMessage] = useState('');
@@ -96,65 +103,89 @@ function InGame() {
     setQuizMsg
   });
 
+  useEffect(() => {
+    async function prepareGuestAndConnect() {
+      try {
+        let guestUuid = document.cookie
+          .split('; ')
+          .find(row => row.startsWith('kkua_guest_uuid='))
+          ?.split('=')[1];
+
+        if (!guestUuid) {
+          console.log("✅ 게스트 UUID 없음 -> 로그인 요청");
+          const loginRes = await axiosInstance.post('/guests/login');
+          guestUuid = loginRes.data.uuid;
+
+          // 수동으로 쿠키 저장 (테스트용. 서버가 Set-Cookie 하면 생략)
+          document.cookie = `kkua_guest_uuid=${guestUuid}; path=/`;
+        }
+
+        console.log("✅ 게스트 인증 성공, 방 입장 시도");
+
+        console.log("✅ 방 입장 성공, 소켓 연결 시도");
+        connectSocket(gameid);
+
+      } catch (error) {
+        console.error("❌ 준비 실패:", error);
+        alert("방 입장 실패 또는 서버 연결 실패ㅁㅁㅁ");
+      }
+    }
+
+    if (gameid) {
+      prepareGuestAndConnect();
+    }
+  }, [gameid, navigate]);
+
+  // 나머지 게임 로직은 기존 그대로 ↓↓↓
+
+
   const handleTypingDone = () => {
     if (!pendingItem) return;
- 
-    setUsedLog(prev => {
-      if (!prev.includes(pendingItem.word)) {
-        return [...prev, pendingItem.word];
-      }
-      return prev;
-    });
- 
-    setItemList(prev => {
-      if (!prev.find(item => item.word === pendingItem.word)) {
-        return [...prev, pendingItem];
-      }
-      return prev;
-    });
- 
+
+    setUsedLog(prev => (!prev.includes(pendingItem.word) ? [...prev, pendingItem.word] : prev));
+    setItemList(prev => (!prev.find(item => item.word === pendingItem.word) ? [...prev, pendingItem] : prev));
     setQuizMsg(pendingItem.word.charAt(pendingItem.word.length - 1));
- 
+
     setSpecialPlayer(prev => {
       const currentIndex = socketParticipants.map(p => p.nickname).indexOf(prev);
-      const nextIndex = (currentIndex + 1) % socketParticipants.length;
-      return socketParticipants[nextIndex]?.nickname || prev;
+      return socketParticipants.map(p => p.nickname)[(currentIndex + 1) % socketParticipants.length];
     });
- 
+
+    sendWordToServer({
+      user: specialPlayer,
+      word: pendingItem.word,
+      itemUsed: false,
+    });
+
     setTypingText('');
     setPendingItem(null);
     setInputTimeLeft(12);
-
-    setReactionTimes(prev => [...prev, 12 - inputTimeLeft]);
+    setCatActive(true);
   };
 
   useEffect(() => {
-    const updateCount = () => {
-      const isWide = window.innerWidth >= 1024;
-      setShowCount(isWide ? 4 : 3);
-    };
+    const updateCount = () => setShowCount(window.innerWidth >= 1024 ? 4 : 3);
     updateCount();
     window.addEventListener('resize', updateCount);
     return () => window.removeEventListener('resize', updateCount);
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setInputTimeLeft(prev => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
+    const timer = setInterval(() => setInputTimeLeft(prev => (prev > 0 ? prev - 1 : 0)), 1000);
     return () => clearInterval(timer);
   }, []);
-  
+
   useEffect(() => {
     if (inputTimeLeft === 0 && inputValue.trim() === '' && typingText === '') {
       setTimeout(() => {
         setMessage('게임종료!');
         setFrozenTime(timeLeft);
         setRandomQuizWord();
-        resetTimer(); // 상단 타이머 종료
-      }, 500); // Wait for gauge and cat animation to visibly finish
+        setCatActive(false);
+        resetTimer();
+      }, 500);
     }
-  }, [inputTimeLeft, inputValue, typingText]);
+  }, [inputTimeLeft, inputValue, typingText, timeLeft, resetTimer]);
 
   const crashKeyDown = (e) => {
     if (e.key === 'Enter') {
@@ -170,14 +201,13 @@ function InGame() {
       console.log(error)
       alert("종료된 게임이 아닙니다.");
     }
-  }
+  };
 
   return (
     <>
       <Layout
         typingText={typingText}
         handleTypingDone={handleTypingDone}
-        //message={message}
         quizMsg={quizMsg}
         message={timeOver ? '시간 초과!' : message}
         timeLeft={frozenTime ?? timeLeft}
@@ -199,6 +229,8 @@ function InGame() {
         usedLog={usedLog}
         reactionTimes={reactionTimes}
         handleClickFinish={handleClickFinish}
+        catActive={catActive}
+        frozenTime={frozenTime}
       />
       {socketParticipants.length > 0 && (
         <div className="fixed bottom-4 left-4 z-50">
@@ -220,7 +252,7 @@ function InGame() {
         </div>
       )}
     </>
-  )
+  );
 }
 
 export default InGame;
