@@ -236,20 +236,7 @@ function Layout({
         </div>
       )}
 
-      {socketParticipants.length > 0 && guestStore.getState().guest_id === socketParticipants.find(p => p.is_owner)?.guest_id && (
-        <div className="fixed bottom-4 left-4 z-50">
-          <button
-            onClick={() => {
-              if (typeof handleClickFinish === 'function') {
-                handleClickFinish();
-              }
-            }}
-            className="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 transition"
-          >
-            게임 종료
-          </button>
-        </div>
-      )}
+    
     </div>
   );
 }

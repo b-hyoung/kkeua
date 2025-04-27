@@ -340,33 +340,30 @@ useEffect(() => {
        
         </div>
       </div>
-      {socketParticipants.length > 0 && (
+      {socketParticipants.length > 0 && guestStore.getState().guest_id === socketParticipants.find(p => p.is_owner)?.guest_id && (
+        <div className="fixed top-10 left-4 z-50 flex space-x-2">
+          <button
+            onClick={() => requestStartWordChainGame("끝말잇기")}
+            className="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600 transition"
+          >
+            게임 시작
+          </button>
+          <button
+            onClick={handleClickFinish}
+            className="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 transition ml-2"
+          >
+            게임 종료
+          </button>
+        </div>
+      )}
+      {socketParticipants.length > 0 && guestStore.getState().guest_id !== socketParticipants.find(p => p.is_owner)?.guest_id && (
         <div className="fixed bottom-4 left-4 z-50">
-          {guestStore.getState().guest_id === socketParticipants.find(p => p.is_owner)?.guest_id ? (
-            <>
-              <button
-                onClick={() => requestStartWordChainGame("끝말잇기")}
-                className="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600 transition"
-              >
-                게임 시작
-              </button>
-              <button
-                onClick={handleClickFinish}
-                className="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 transition ml-2"
-              >
-                게임 종료
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={() => navigate(gameLobbyUrl(gameid))}
-                className="bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600 transition"
-              >
-                로비 이동
-              </button>
-            </>
-          )}
+          <button
+            onClick={() => navigate(gameLobbyUrl(gameid))}
+            className="bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600 transition"
+          >
+            로비 이동
+          </button>
         </div>
       )}
     </>

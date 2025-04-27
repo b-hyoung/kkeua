@@ -7,7 +7,13 @@ export function connectSocket(gameId) {
   // 쿠키 읽기
   const cookies = document.cookie.split(';').map(c => c.trim());
   const guestCookie = cookies.find(c => c.startsWith('kkua_guest_uuid='));
-  const guestUuid = guestCookie ? guestCookie.split('=')[1] : null;
+  let guestUuid = guestCookie ? guestCookie.split('=')[1] : null;
+
+  // 쿠키에서 guest_uuid를 찾지 못한 경우 localStorage에서 찾기
+  if (!guestUuid) {
+    guestUuid = localStorage.getItem('kkua_guest_uuid');
+    console.log("🧩 로컬스토리지에서 guest_uuid를 찾음:", guestUuid);
+  }
 
   console.log("🧩 현재 쿠키 목록:", cookies);
   console.log("🧩 찾은 guest_uuid:", guestUuid);
@@ -15,6 +21,7 @@ export function connectSocket(gameId) {
 
   if (!guestUuid) {
     console.error('🚫 게스트 UUID를 찾을 수 없습니다. 소켓 연결 중단');
+    alert("쿠키 및 로컬스토리지에 유효한 guest_uuid가 없습니다. 로그인 후 다시 시도해주세요.");
     return;
   }
   if (!gameId) {
