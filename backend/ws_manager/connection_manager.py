@@ -55,35 +55,56 @@ class ConnectionManager:
     
     async def broadcast_to_room(self, room_id: int, message: dict):
         """방의 모든 사용자에게 메시지 전송"""
-        if room_id in self.active_connections:
-            # 메시지 형식 확인 및 누락된, 중요 필드 기본값 설정
-            if 'type' not in message:
-                message['type'] = 'message'
-            if 'timestamp' not in message:
-                message['timestamp'] = datetime.utcnow().isoformat()
+        # 타입 변환 시도 (문자열로 들어온 경우 처리)
+        try:
+            room_id_key = int(room_id)
+        except (ValueError, TypeError):
+            room_id_key = room_id
             
-            # 디버깅용 로그
-            print(f"브로드캐스트 메시지: {json.dumps(message)}")
+        print(f"브로드캐스트 시도: room_id={room_id_key}, 메시지 타입={message.get('type', 'unknown')}")
+        
+        # active_connections에 room_id가 있는지 확인
+        if room_id_key not in self.active_connections:
+            print(f"방 ID {room_id_key}에 대한 활성 연결이 없습니다.")
+            return
             
-            # 닫힌 연결 추적
-            closed_connections = []
-            
-            for guest_id, connection in self.active_connections[room_id].items():
-                try:
-                    # 웹소켓 상태 확인
-                    if connection.client_state.CONNECTED:
-                        await connection.send_text(json.dumps(message))
-                    else:
-                        print(f"연결이 이미 닫힘: room_id={room_id}, guest_id={guest_id}")
-                        closed_connections.append(guest_id)
-                except RuntimeError as e:
-                    print(f"메시지 전송 오류: {str(e)} - room_id={room_id}, guest_id={guest_id}")
+        # active_connections[room_id]가 딕셔너리인지 확인
+        room_connections = self.active_connections[room_id_key]
+        if not isinstance(room_connections, dict):
+            print(f"방 {room_id_key}의 연결 정보가 예상 형식이 아닙니다: {type(room_connections)}")
+            # 딕셔너리가 아닌 경우 초기화
+            self.active_connections[room_id_key] = {}
+            return
+        
+        # 메시지 형식 확인 및 누락된, 중요 필드 기본값 설정
+        if 'type' not in message:
+            message['type'] = 'message'
+        if 'timestamp' not in message:
+            message['timestamp'] = datetime.utcnow().isoformat()
+        
+        # 디버깅용 로그
+        print(f"브로드캐스트 메시지: {json.dumps(message)}")
+        print(f"방 {room_id_key}의 연결 상태: {len(room_connections)}개 연결")
+        
+        # 닫힌 연결 추적
+        closed_connections = []
+        
+        for guest_id, connection in room_connections.items():
+            try:
+                # 웹소켓 상태 확인
+                if connection and hasattr(connection, 'client_state') and connection.client_state.CONNECTED:
+                    await connection.send_text(json.dumps(message))
+                else:
+                    print(f"연결이 이미 닫힘: room_id={room_id_key}, guest_id={guest_id}")
                     closed_connections.append(guest_id)
-            
-            # 닫힌 연결 제거
-            for guest_id in closed_connections:
-                self.active_connections[room_id].pop(guest_id, None)
-                print(f"닫힌 연결 제거됨: room_id={room_id}, guest_id={guest_id}")
+            except Exception as e:
+                print(f"메시지 전송 오류: {str(e)} - room_id={room_id_key}, guest_id={guest_id}")
+                closed_connections.append(guest_id)
+        
+        # 닫힌 연결 제거
+        for guest_id in closed_connections:
+            room_connections.pop(guest_id, None)
+            print(f"닫힌 연결 제거됨: room_id={room_id_key}, guest_id={guest_id}")
     
     async def broadcast_room_update(self, room_id: int, update_type: str, data: dict = None):
         """방 상태 업데이트 알림"""

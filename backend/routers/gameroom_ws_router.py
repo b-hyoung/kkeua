@@ -78,6 +78,7 @@ async def process_message(
     participant: GameroomParticipant,
     gameroom_repo: GameroomRepository
 ):
+    print("asdf")
     """웹소켓 메시지 처리"""
     message_type = message_data.get("type")
     
@@ -354,6 +355,7 @@ async def process_word_chain_message(
 
     # 추가: 단어 검증 기능
     elif action == "validate_word":
+        print(f"[WS] validate_word 액션 처리 시작: {message_data}")
         word = message_data.get("word", "").strip()
         if not word:
             await ws_manager.send_personal_message({
@@ -363,26 +365,19 @@ async def process_word_chain_message(
             }, websocket)
             return
             
-        # 게임 상태 확인
-        game_state = ws_manager.get_game_state(room_id)
-        if not game_state or not game_state["started"]:
-            await ws_manager.send_personal_message({
-                "type": "word_validation_result",
-                "valid": False,
-                "message": "게임이 시작되지 않았습니다."
-            }, websocket)
-            return
-            
+        # 게임 상태 확인 (초기화되지 않은 경우 대비)
+        game_state = ws_manager.get_game_state(room_id) or {}
+        
         # 끝말잇기 규칙 검증
         is_valid = True
         message = "유효한 단어입니다."
         
         # 첫 글자 검증
         last_char = game_state.get("last_character", "")
-        words_used = game_state.get("words_used", [])
+        used_words = game_state.get("used_words", [])
         
         # 첫 단어인 경우 첫 글자 검증 스킵
-        if not words_used:
+        if not used_words:
             # 첫 단어는 아무 단어나 가능
             pass
         elif word[0] != last_char:
@@ -390,7 +385,7 @@ async def process_word_chain_message(
             message = f"'{last_char}'로 시작하는 단어를 입력해야 합니다."
         
         # 사용된 단어 검증
-        elif word in words_used:
+        elif word in used_words:
             is_valid = False
             message = "이미 사용된 단어입니다."
         
@@ -403,9 +398,8 @@ async def process_word_chain_message(
         word_meaning = f"'{word}'의 임시 의미: {word}(은)는 한국어 단어입니다."
         
         # 유저 정보 가져오기
-        user_info = ws_manager.get_connection_user_info(websocket)
-        nickname = user_info.get("nickname", "플레이어") if user_info else "플레이어"
-        guest_id = user_info.get("guest_id") if user_info else None
+        nickname = guest.nickname
+        guest_id = guest.guest_id
         
         # 검증 결과를 모든 참가자에게 브로드캐스트
         validation_result = {
@@ -426,22 +420,19 @@ async def process_word_chain_message(
         
         # 유효한 단어인 경우 게임 상태 업데이트
         if is_valid:
-            # 사용된 단어 목록에 추가
-            if "words_used" not in game_state:
-                game_state["words_used"] = []
-            game_state["words_used"].append(word)
-            
-            # 마지막 글자 업데이트
-            game_state["last_character"] = word[-1]
-            
-            # 마지막 제출자 정보 업데이트
-            game_state["last_player"] = {
-                "nickname": nickname,
-                "guest_id": guest_id
-            }
-            
-            # 게임 상태 업데이트
-            ws_manager.update_game_state(room_id, game_state)
+            # 게임 상태가 없으면 초기화
+            if room_id not in ws_manager.word_chain_games:
+                ws_manager.word_chain_games[room_id] = {
+                    "current_word": word,
+                    "last_character": word[-1],
+                    "used_words": [word],
+                    "nicknames": {guest_id: nickname}
+                }
+            else:
+                # 기존 게임 상태 업데이트
+                ws_manager.word_chain_games[room_id]["current_word"] = word
+                ws_manager.word_chain_games[room_id]["last_character"] = word[-1]
+                ws_manager.word_chain_games[room_id]["used_words"].append(word)
 
 @router.websocket("/{room_id}/{guest_uuid}")
 async def websocket_endpoint(
@@ -503,12 +494,25 @@ async def websocket_endpoint(
             # 메시지 수신 루프
             while True:
                 data = await websocket.receive_text()
-                message_data = json.loads(data)
-                print(f"웹소켓 메시지 수신: {message_data}")
+                print(f"[WS] 수신된 원본 메시지: {data}")
                 
-                # 메시지 처리 (도우미 함수 사용)
-                await process_message(message_data, websocket, room_id, guest, participant, gameroom_repo)
-                
+                try:
+                    # JSON 파싱
+                    message_data = json.loads(data)
+                    action = message_data.get("action", "")
+                    
+                    print(f"[WS] 파싱된 메시지: action={action}, data={message_data}")
+                    
+                    # 메시지 처리 (도우미 함수 사용)
+                    await process_message(message_data, websocket, room_id, guest, participant, gameroom_repo)
+                    
+                except Exception as e:
+                    # 기타 예외 처리
+                    print(f"웹소켓 오류: {str(e)}")
+                    traceback.print_exc()  # 상세 예외 정보 출력
+                    if guest:
+                        await ws_manager.disconnect(websocket, room_id, guest.guest_id)
+                    
         except WebSocketDisconnect:
             # 연결 종료 처리
             print(f"웹소켓 연결 종료됨: room_id={room_id}, guest_id={guest.guest_id}")
@@ -525,12 +529,14 @@ async def websocket_endpoint(
             )
             
         except Exception as e:
-            # 기타 예외 처리
-            print(f"웹소켓 오류: {str(e)}")
+            # 전역 예외 처리
+            print(f"웹소켓 전역 오류: {str(e)}")
             traceback.print_exc()  # 상세 예외 정보 출력
-            if guest:
-                await ws_manager.disconnect(websocket, room_id, guest.guest_id)
-                
+            try:
+                await websocket.close(code=4003, reason=f"오류 발생: {str(e)}")
+            except:
+                pass 
+
     except Exception as e:
         # 전역 예외 처리
         print(f"웹소켓 전역 오류: {str(e)}")
