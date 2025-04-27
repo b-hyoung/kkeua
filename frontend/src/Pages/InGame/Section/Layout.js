@@ -1,11 +1,34 @@
 import guestStore from '../../../store/guestStore';
 import './Layout.css';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import TopMsgAni from './TopMsg_Ani';
 import Timer from './Timer';
 import msgData from './MsgData';
 import { workingCatImg } from '../../../Component/imgUrl';
 import EndPointModal from './EndPointModal';
+
+function ProgressBar({ inputTimeLeft }) {
+  return (
+    <div className="relative h-1.5 w-full bg-gray-200">
+      <div
+        className={`absolute top-0 left-0 h-full ${inputTimeLeft <= 3 ? 'bg-red-400' : 'bg-orange-400'} rounded-r-full`}
+        style={{
+          width: `${(inputTimeLeft / 120) * 100}%`,
+          transition: inputTimeLeft === 120 ? 'none' : 'width 1s linear',
+        }}
+      ></div>
+      <img
+        src={workingCatImg}
+        alt="고양이22"
+        className="absolute top-1/2 w-6 h-6 z-10"
+        style={{
+          left: `${inputTimeLeft === 120 ? '100%' : (inputTimeLeft / 120) * 100 + '%'}`,
+          transform: 'translate(-50%, -50%)',
+        }}
+      />
+    </div>
+  );
+}
 
 function Layout({
   quizMsg, 
@@ -34,6 +57,7 @@ function Layout({
   reactionTimes, // Added reactionTimes prop
   handleClickFinish // <-- Add this line
 }) {
+
   useEffect(() => {
     window.setInputTimeLeftFromSocket = (time) => {
       setInputTimeLeft(time);
@@ -92,19 +116,23 @@ function Layout({
 
           <div className="w-full md:w-[750px] px-2 md:px-4 space-y-4 tracking-wide">
             <div className="bg-gray-100 p-6 rounded-xl space-y-4 pb-10 mb-2 min-h-[480px]">
-              {itemList.slice(-showCount).map((item, index) => (
-                <div key={index} className="p-4 rounded-2xl border shadow-lg bg-white border-gray-300 drop-shadow-md">
-                  <div className="flex items-center space-x-4 ml-2">
-                    <div className={`w-8 h-8 ${index === 0 ? 'bg-blue-400' : index === 1 ? 'bg-green-400' : 'bg-purple-400'} rounded-full`}></div>
-                    <span className="font-semibold text-lg text-black">
-                      {item.word.slice(0, -1)}<span className="text-red-500">{item.word.charAt(item.word.length - 1)}</span>
-                    </span>
+              {itemList.length === 0 ? (
+                <div className="text-center text-gray-400">🎮 게임이 시작되면 여기에 단어가 나타납니다!</div>
+              ) : (
+                itemList.slice(-showCount).map((item, index) => (
+                  <div key={index} className="p-4 rounded-2xl border shadow-lg bg-white border-gray-300 drop-shadow-md mx-auto">
+                    <div className="flex items-center space-x-4 ml-2">
+                      <div className={`w-8 h-8 ${index === 0 ? 'bg-blue-400' : index === 1 ? 'bg-green-400' : 'bg-purple-400'} rounded-full`}></div>
+                      <span className="font-semibold text-lg text-black">
+                        {item.word.slice(0, -1)}<span className="text-red-500">{item.word.charAt(item.word.length - 1)}</span>
+                      </span>
+                    </div>
+                    <div className="text-gray-500 text-sm ml-2 mt-2 break-words max-w-md text-left">
+                      {item.desc}
+                    </div>
                   </div>
-                  <div className="text-gray-500 text-sm ml-2 mt-2 break-words max-w-md text-left">
-                    {item.desc}
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -186,24 +214,7 @@ function Layout({
         {/* 하단 입력창 */}
         <div className="w-full fixed bottom-0 bg-white z-50 border-t border-gray">
           {/* 게이지 bar */}
-          <div className={`relative h-1.5 w-full bg-gray-200`}>
-            <div
-              className={`absolute top-0 left-0 h-full ${inputTimeLeft <= 3 ? 'bg-red-400' : 'bg-orange-400'} rounded-r-full ${inputTimeLeft === 120 ? '' : 'transition-all duration-1000'}`}
-              style={{
-                width: `${(inputTimeLeft / 120) * 100}%`,
-                transition: inputTimeLeft === 120 ? 'none' : 'width 1s linear',
-              }}
-            ></div>
-            <img
-              src={workingCatImg}
-              alt="고양이22"
-              className={`absolute top-1/2 w-6 h-6 z-10 ${inputTimeLeft === 120 ? '' : 'transition-[left] ease-linear duration-1000'}`}
-              style={{
-                left: `${inputTimeLeft === 120 ? '100%' : (inputTimeLeft / 120) * 100 + '%'}`,
-                transform: 'translate(-50%, -50%)',
-              }}
-            />
-          </div>
+          <ProgressBar inputTimeLeft={inputTimeLeft} />
 
           {/* 입력창 */}
           <div className="w-full px-[5%] flex items-center space-x-2 py-4">
@@ -241,4 +252,4 @@ function Layout({
   );
 }
 
-export default Layout;
+export default memo(Layout);

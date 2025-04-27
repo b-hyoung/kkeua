@@ -4,6 +4,12 @@ let receiveWordHandler = null; // (⭐) 외부 핸들러 저장
 export function connectSocket(gameId) {
   console.log("📌 connectSocket 호출됨");
 
+  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+    console.log("🔌 기존 소켓 정리 중...");
+    socket.close();
+    socket = null;
+  }
+
   // 쿠키 읽기
   const cookies = document.cookie.split(';').map(c => c.trim());
   const guestCookie = cookies.find(c => c.startsWith('kkua_guest_uuid='));
@@ -37,6 +43,9 @@ export function connectSocket(gameId) {
 
     socket.onopen = () => {
       console.log("✅ WebSocket 연결 성공:", socketUrl);
+      if (receiveWordHandler) {
+        console.log("✅ 초기 수신 핸들러 세팅 완료");
+      }
     };
 
     socket.onmessage = (event) => {
@@ -70,6 +79,7 @@ export function connectSocket(gameId) {
 
     socket.onclose = (e) => {
       console.warn(`❌ WebSocket 끊김: code=${e.code}, reason=${e.reason}`);
+      socket = null;
     };
 
     

@@ -49,40 +49,19 @@ useEffect(() => {
   setReceiveWordHandler((data) => {
     console.log("💬 서버에서 수신:", data);
 
-    if (data.type === "word_chain_word_submitted") {
-      setUsedWords(prev => [...prev, data.word]);
-      setCurrentPlayer(data.next_player);
-      setLastCharacter(data.last_character);
-    }
+    // ✅ 오직 'word_validation_result' + valid: true 인 경우만 처리
+    if (data.type === "word_validation_result" && data.valid) {
+      console.log('✅ 유효한 단어 수신:', data.word);
 
-    if (data.type === "word_chain_started") {
-      alert("🎉 게임이 시작되었습니다!");
-      updateStatus('playing');
-    }
-
-    if (data.type === "word_chain_state") {
-      setUsedWords(data.words_used || []);
-      setCurrentPlayer(data.current_player || null);
-      setLastCharacter(data.last_character || '');
-    }
-
-    if (data.type === "word_chain_game_ended") {
-      console.log('🏁 게임 종료:', data.ended_by?.nickname);
-    }
-
-    if (data.type === "word_chain_error") {
-      console.warn('⚠️ 끝말잇기 에러:', data.message);
-    }
-
-    if (data.type === "word_validation_result") {
-      console.log('🔎 단어 검증 결과:', data.valid ? "✅ 유효함" : "❌ 무효함", data.message);
-    }
-
-    if (data.type === "time_sync") {
-      console.log('⏱️ 서버 시간 동기화:', data.time_left);
-      if (typeof window.setInputTimeLeftFromSocket === 'function') {
-        window.setInputTimeLeftFromSocket(data.time_left);
-      }
+      setItemList(prev => {
+        if (prev.find(item => item.word === data.word)) {
+          console.log('🔁 이미 존재하는 단어. 추가 안함:', data.word);
+          return prev;
+        }
+        const updated = [{ word: data.word, desc: data.meaning || "유효한 단어입니다." }, ...prev];
+        console.log('🆕 업데이트된 itemList:', updated);
+        return updated;
+      });
     }
   });
 }, []);
@@ -163,59 +142,6 @@ useEffect(() => {
         }
   
         connectSocket(gameid);
-  
-        const socket = getSocket();
-        if (socket) {
-          socket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            console.log('📨 수신 데이터:', data);
-
-            if (data.type === "word_chain_state") {
-              console.log('✅ [초기 상태] word_chain_state 수신:', data);
-              setUsedWords(data.words_used || []);
-              setCurrentPlayer(data.current_player || null);
-              setLastCharacter(data.last_character || '');
-            }
-
-            if (data.type === "word_chain_word_submitted") {
-              console.log('✅ [단어 제출됨] word_chain_word_submitted 수신:', data);
-              setUsedWords(prev => [...prev, data.word]);
-              setCurrentPlayer(data.next_player);
-              setLastCharacter(data.last_character);
-            }
-
-            if (data.type === "word_chain_initialized") {
-              console.log('🧩 끝말잇기 준비 완료:', data.message);
-            }
-
-            if (data.type === "word_chain_started") {
-              console.log('🚀 게임 시작:', data.first_word, '첫 번째 플레이어:', data.current_player_nickname);
-              alert("🎉 게임이 시작되었습니다!");
-              updateStatus('playing'); // 게임 상태를 playing으로 설정
-            }
-
-            if (data.type === "word_chain_game_ended") {
-              console.log('🏁 게임 종료:', data.ended_by?.nickname);
-            }
-
-            if (data.type === "word_chain_error") {
-              console.warn('⚠️ 끝말잇기 에러:', data.message);
-            }
-
-            if (data.type === "word_validation_result") {
-              console.log('🔎 단어 검증 결과:', data.valid ? "✅ 유효함" : "❌ 무효함", data.message);
-            }
-
-            if (data.type === "time_sync") {
-              console.log('⏱️ 서버 시간 동기화:', data.time_left);
-              if (typeof window.setInputTimeLeftFromSocket === 'function') {
-                window.setInputTimeLeftFromSocket(data.time_left);
-              }
-            }
-
-            // 기존 다른 메세지 수신 구조는 그대로 유지
-          };
-        }
   
       } catch (error) {
         console.error("❌ 방 입장 또는 소켓 연결 실패:", error.response?.data || error.message);
