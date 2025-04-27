@@ -13,8 +13,8 @@ import userIsTrue from '../../Component/userIsTrue';
 import guestStore from '../../store/guestStore';
 
 import { connectSocket, getSocket, setReceiveWordHandler } from './Socket/mainSocket';
-
 import { sendWordToServer } from './Socket/kdataSocket';
+import { submitWordChainWord, requestStartWordChainGame } from './Socket/mainSocket'; // ✅ 끝말잇기 소켓 헬퍼 불러오기
 
 const time_gauge = 40;
 
@@ -30,7 +30,6 @@ function InGame() {
     participants: socketParticipants,
     gameStatus,
     isReady,
-    sendMessage,
     toggleReady,
     updateStatus,
     roomUpdated,
@@ -46,16 +45,47 @@ function InGame() {
     }
   };
 
-  useEffect(() => {
-    // 단어 수신 핸들러 등록
-    setReceiveWordHandler((data) => {
-      console.log("💬 서버에서 단어 수신:", data);
-      if (data && data.word) {
-        setTypingText(data.word);  // 이건 예시야. 너 흐름에 맞게 사용해야 해.
-        setPendingItem({ word: data.word });
+useEffect(() => {
+  setReceiveWordHandler((data) => {
+    console.log("💬 서버에서 수신:", data);
+
+    if (data.type === "word_chain_word_submitted") {
+      setUsedWords(prev => [...prev, data.word]);
+      setCurrentPlayer(data.next_player);
+      setLastCharacter(data.last_character);
+    }
+
+    if (data.type === "word_chain_started") {
+      alert("🎉 게임이 시작되었습니다!");
+      updateStatus('playing');
+    }
+
+    if (data.type === "word_chain_state") {
+      setUsedWords(data.words_used || []);
+      setCurrentPlayer(data.current_player || null);
+      setLastCharacter(data.last_character || '');
+    }
+
+    if (data.type === "word_chain_game_ended") {
+      console.log('🏁 게임 종료:', data.ended_by?.nickname);
+    }
+
+    if (data.type === "word_chain_error") {
+      console.warn('⚠️ 끝말잇기 에러:', data.message);
+    }
+
+    if (data.type === "word_validation_result") {
+      console.log('🔎 단어 검증 결과:', data.valid ? "✅ 유효함" : "❌ 무효함", data.message);
+    }
+
+    if (data.type === "time_sync") {
+      console.log('⏱️ 서버 시간 동기화:', data.time_left);
+      if (typeof window.setInputTimeLeftFromSocket === 'function') {
+        window.setInputTimeLeftFromSocket(data.time_left);
       }
-    });
-  }, []);
+    }
+  });
+}, []);
 
   useEffect(() => {
     setRandomQuizWord();
@@ -139,20 +169,51 @@ function InGame() {
           socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
             console.log('📨 수신 데이터:', data);
-  
+
             if (data.type === "word_chain_state") {
-              console.log('✅ word_chain_state 수신:', data);
+              console.log('✅ [초기 상태] word_chain_state 수신:', data);
               setUsedWords(data.words_used || []);
               setCurrentPlayer(data.current_player || null);
               setLastCharacter(data.last_character || '');
             }
-  
+
             if (data.type === "word_chain_word_submitted") {
-              console.log('✅ word_chain_word_submitted 수신:', data);
+              console.log('✅ [단어 제출됨] word_chain_word_submitted 수신:', data);
               setUsedWords(prev => [...prev, data.word]);
               setCurrentPlayer(data.next_player);
               setLastCharacter(data.last_character);
             }
+
+            if (data.type === "word_chain_initialized") {
+              console.log('🧩 끝말잇기 준비 완료:', data.message);
+            }
+
+            if (data.type === "word_chain_started") {
+              console.log('🚀 게임 시작:', data.first_word, '첫 번째 플레이어:', data.current_player_nickname);
+              alert("🎉 게임이 시작되었습니다!");
+              updateStatus('playing'); // 게임 상태를 playing으로 설정
+            }
+
+            if (data.type === "word_chain_game_ended") {
+              console.log('🏁 게임 종료:', data.ended_by?.nickname);
+            }
+
+            if (data.type === "word_chain_error") {
+              console.warn('⚠️ 끝말잇기 에러:', data.message);
+            }
+
+            if (data.type === "word_validation_result") {
+              console.log('🔎 단어 검증 결과:', data.valid ? "✅ 유효함" : "❌ 무효함", data.message);
+            }
+
+            if (data.type === "time_sync") {
+              console.log('⏱️ 서버 시간 동기화:', data.time_left);
+              if (typeof window.setInputTimeLeftFromSocket === 'function') {
+                window.setInputTimeLeftFromSocket(data.time_left);
+              }
+            }
+
+            // 기존 다른 메세지 수신 구조는 그대로 유지
           };
         }
   
@@ -219,9 +280,17 @@ function InGame() {
     }
   }, [inputTimeLeft, inputValue, typingText, timeLeft, resetTimer]);
 
+  // ✅ 단어 제출 함수
+  const handleSubmitWord = () => {
+    if (inputValue.trim() !== '') {
+      submitWordChainWord(inputValue.trim());
+      setInputValue('');
+    }
+  };
+
   const crashKeyDown = (e) => {
     if (e.key === 'Enter') {
-      crashMessage();
+      handleSubmitWord();
     }
   };
 
@@ -263,18 +332,12 @@ function InGame() {
         handleClickFinish={handleClickFinish}
         catActive={catActive}
         frozenTime={frozenTime}
+        isPlaying={gameStatus === 'playing'}
       />
       <div className="w-full max-w-md mx-auto mt-4 p-2 bg-gray-100 rounded-lg shadow">
         <h2 className="text-center font-bold mb-2">📤 전송한 메시지</h2>
         <div className="space-y-1 max-h-[200px] overflow-y-auto">
-          {sentMessages.map((msg, index) => (
-            <div key={index} className="p-2 bg-white rounded shadow text-sm">
-              <div className={msg.result === '성공' ? 'text-green-500 font-bold' : 'text-red-500 font-bold'}>
-                📝 {msg.result} - {msg.word || 'N/A'}
-              </div>
-              <div className="text-xs text-gray-400">{new Date(msg.timestamp).toLocaleTimeString()}</div>
-            </div>
-          ))}
+       
         </div>
       </div>
       {socketParticipants.length > 0 && (
@@ -282,16 +345,16 @@ function InGame() {
           {guestStore.getState().guest_id === socketParticipants.find(p => p.is_owner)?.guest_id ? (
             <>
               <button
-                onClick={handleClickFinish}
-                className="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 transition"
+                onClick={() => requestStartWordChainGame("끝말잇기")}
+                className="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600 transition"
               >
-                게임 종료
+                게임 시작
               </button>
               <button
-                onClick={() => sendCustomBroadcast("🔥 긴급 브로드캐스트 테스트")}
-                className="bg-purple-500 text-white px-4 py-2 rounded-lg shadow hover:bg-purple-600 transition mt-2"
+                onClick={handleClickFinish}
+                className="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 transition ml-2"
               >
-                브로드캐스트 테스트
+                게임 종료
               </button>
             </>
           ) : (
@@ -301,12 +364,6 @@ function InGame() {
                 className="bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600 transition"
               >
                 로비 이동
-              </button>
-              <button
-                onClick={() => sendCustomBroadcast("🔥 긴급 브로드캐스트 테스트")}
-                className="bg-purple-500 text-white px-4 py-2 rounded-lg shadow hover:bg-purple-600 transition mt-2"
-              >
-                브로드캐스트 테스트
               </button>
             </>
           )}

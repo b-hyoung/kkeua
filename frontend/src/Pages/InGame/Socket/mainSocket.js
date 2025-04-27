@@ -34,11 +34,25 @@ export function connectSocket(gameId) {
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      console.log('📨 수신한 메시지:', data);
-  
-      // (⭐) word_chain_word_submitted 오면 외부 핸들러 호출
-      if (data.type === "word_chain_word_submitted" && receiveWordHandler) {
-        receiveWordHandler(data);
+      console.log('📨 수신 데이터:', data);
+
+      const wordChainRelevantTypes = [
+        "word_chain_state",
+        "word_chain_word_submitted",
+        "word_chain_started",
+        "word_chain_game_ended",
+        "word_chain_error",
+        "word_validation_result",
+        "time_sync"
+      ];
+
+      if (wordChainRelevantTypes.includes(data.type)) {
+        console.log(`✅ [끝말잇기] 타입 수신: ${data.type}`, data);
+        if (receiveWordHandler) {
+          receiveWordHandler(data);
+        }
+      } else {
+        console.warn('📭 [메인소켓] 처리하지 않는 타입 수신:', data.type);
       }
     };
 
@@ -51,14 +65,6 @@ export function connectSocket(gameId) {
       console.warn(`❌ WebSocket 끊김: code=${e.code}, reason=${e.reason}`);
     };
 
-    socket.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      console.log('📨 수신한 전체 메시지:', data);  // 이거 추가
-    
-      if (data.type === "word_chain_word_submitted" && receiveWordHandler) {
-        receiveWordHandler(data);
-      }
-    };
     
 
   } catch (error) {
@@ -72,4 +78,27 @@ export function setReceiveWordHandler(handler) {
 
 export function getSocket() {
   return socket;
+}
+
+
+// ✅ 최소 추가: 끝말잇기 단어 제출
+export function submitWordChainWord(word) {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: "submit_word",
+      word: word
+    }));
+    console.log('✍️ [끝말잇기] 단어 제출 전송됨:', word);
+  }
+}
+
+// ✅ 최소 추가: 끝말잇기 게임 시작 요청
+export function requestStartWordChainGame(firstWord = "끝말잇기") {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: "start_game",
+      first_word: firstWord
+    }));
+    console.log('🚀 [끝말잇기] 게임 시작 요청 보냄, 첫 단어:', firstWord);
+  }
 }
