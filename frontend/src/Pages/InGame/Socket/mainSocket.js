@@ -85,13 +85,11 @@ export function getSocket() {
 export function submitWordChainWord(word) {
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
-      type: "submit_word",
+      type: "word_chain",
+      action: "validate_word",
       word: word
     }));
-    console.log('✍️ [끝말잇기] 단어 제출 전송됨:', word);
-  }
-}
-
+  }}
 // ✅ 최소 추가: 끝말잇기 게임 시작 요청
 export function requestStartWordChainGame(firstWord = "끝말잇기") {
   if (socket && socket.readyState === WebSocket.OPEN) {
