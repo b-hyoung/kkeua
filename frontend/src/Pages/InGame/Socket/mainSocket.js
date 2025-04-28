@@ -111,9 +111,21 @@ export function submitWordChainWord(word) {
 export function requestStartWordChainGame(firstWord = "끝말잇기") {
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify({
-      type: "start_game",
+      type: "word_chain",
+      action: "start_game",
       first_word: firstWord
     }));
     console.log('🚀 [끝말잇기] 게임 시작 요청 보냄, 첫 단어:', firstWord);
+  }
+}
+
+// ✅ 추가: 끝말잇기 게임 종료 요청
+export function requestEndWordChainGame() {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: "word_chain",
+      action: "end_game"
+    }));
+    console.log('🏁 [끝말잇기] 게임 종료 요청 보냄');
   }
 }

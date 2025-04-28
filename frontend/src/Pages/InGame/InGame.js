@@ -7,14 +7,14 @@ import Layout from './Section/Layout';
 import Timer from './Section/Timer';
 import useTopMsg from './Section/TopMsg';
 import TopMsgAni from './Section/TopMsg_Ani';
-
+import EndPointModal from './Section/EndPointModal';
 import useGameRoomSocket from '../../hooks/useGameRoomSocket';
 import userIsTrue from '../../Component/userIsTrue';
 import guestStore from '../../store/guestStore';
 
-import { connectSocket, getSocket, setReceiveWordHandler } from './Socket/mainSocket';
+import { connectSocket, getSocket, setReceiveWordHandler, submitWordChainWord, requestStartWordChainGame, requestEndWordChainGame } from './Socket/mainSocket';
 import { sendWordToServer } from './Socket/kdataSocket';
-import { submitWordChainWord, requestStartWordChainGame } from './Socket/mainSocket'; // ✅ 끝말잇기 소켓 헬퍼 불러오기
+// import { submitWordChainWord, requestStartWordChainGame } from './Socket/mainSocket'; // ✅ 끝말잇기 소켓 헬퍼 불러오기
 
 const time_gauge = 40;
 
@@ -23,6 +23,7 @@ function InGame() {
   const [quizMsg, setQuizMsg] = useState('햄');
   const { gameid } = useParams();
   const navigate = useNavigate();
+  const [gameEnded, setGameEnded] = useState(false);
 
   // 퀴즈 제시어 
 
@@ -37,6 +38,8 @@ function InGame() {
     finalResults,
     setFinalResults
   } = useGameRoomSocket(gameid);
+
+  const [showEndPointModal, setShowEndPointModal] = useState(false);
 
   const setRandomQuizWord = () => {
     if (itemList.length > 0) {
@@ -62,6 +65,13 @@ useEffect(() => {
         console.log('🆕 업데이트된 itemList:', updated);
         return updated;
       });
+    }
+
+    // 🔥 추가: 게임 종료 브로드캐스트 받으면 모달 열기
+    if (data.type === "word_chain_game_ended") {
+      console.log('🏁 게임 종료 알림 수신:', data);
+      setGameEnded(true);
+      setShowEndPointModal(true);
     }
   });
 }, []);
@@ -91,10 +101,10 @@ useEffect(() => {
   const [catActive, setCatActive] = useState(true);
 
   useEffect(() => {
-    if (timeLeft <= 0) return;
+    if (gameEnded || timeLeft <= 0) return;
     const interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
     return () => clearInterval(interval);
-  }, [timeLeft]);
+  }, [timeLeft, gameEnded]);
 
   const [usedLog, setUsedLog] = useState([]);
   const [specialPlayer, setSpecialPlayer] = useState('부러');
@@ -221,13 +231,24 @@ useEffect(() => {
   };
 
   const handleClickFinish = async () => {
-    try{
-      await axiosInstance.post(ROOM_API.END_ROOMS(gameid))
-      navigate(gameLobbyUrl(gameid))
-    }catch(error){
+    try {
+      await axiosInstance.post(ROOM_API.END_ROOMS(gameid));
+      requestEndWordChainGame();
+      setShowEndPointModal(false);
+      setTimeout(() => setShowEndPointModal(true), 100); // 결과 모달 강제 띄우기
+    } catch (error) {
       console.log(error)
       alert("종료된 게임이 아닙니다.");
     }
+  };
+
+  const handleMoveToLobby = () => {
+    const sock = getSocket();
+    if (sock && sock.readyState === WebSocket.OPEN) {
+      sock.close();
+      console.log('✅ 로비 이동 전에 소켓 정상 종료');
+    }
+    navigate(gameLobbyUrl(gameid));
   };
 
   return (
@@ -259,6 +280,7 @@ useEffect(() => {
         catActive={catActive}
         frozenTime={frozenTime}
         isPlaying={gameStatus === 'playing'}
+        isGameEnded={gameEnded}
       />
       <div className="w-full max-w-md mx-auto mt-4 p-2 bg-gray-100 rounded-lg shadow">
         <h2 className="text-center font-bold mb-2">📤 전송한 메시지</h2>
@@ -274,21 +296,31 @@ useEffect(() => {
           >
             게임 시작
           </button>
-          <button
-            onClick={handleClickFinish}
-            className="bg-red-500 text-white px-4 py-2 rounded-lg shadow hover:bg-red-600 transition ml-2"
-          >
-            게임 종료
-          </button>
         </div>
       )}
       {socketParticipants.length > 0 && guestStore.getState().guest_id !== socketParticipants.find(p => p.is_owner)?.guest_id && (
         <div className="fixed bottom-4 left-4 z-50">
           <button
-            onClick={() => navigate(gameLobbyUrl(gameid))}
+            onClick={handleMoveToLobby}
             className="bg-gray-500 text-white px-4 py-2 rounded-lg shadow hover:bg-gray-600 transition"
           >
             로비 이동
+          </button>
+        </div>
+      )}
+      {showEndPointModal && (
+        <div className="absolute top-0 left-0 w-full flex flex-col items-center justify-center z-50">
+          <EndPointModal
+            players={socketParticipants.length > 0 ? socketParticipants.map(p => p.nickname) : []}
+            onClose={() => setShowEndPointModal(false)}
+            usedLog={usedLog}
+            reactionTimes={reactionTimes}
+          />
+          <button
+            onClick={handleMoveToLobby}
+            className="mt-4 bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition"
+          >
+            로비로 이동
           </button>
         </div>
       )}

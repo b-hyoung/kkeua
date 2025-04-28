@@ -87,6 +87,35 @@ function Layout({
     <div className="w-screen flex justify-center bg-white lg:pb-[100px] px-4">
       <div className="min-h-screen py-4 flex flex-col md:flex-row md:space-x-8 md:justify-center md:items-start w-full max-w-[1920px]">
 
+        {/* 테스트용 결과 보기/고양이 달리기/게임 종료 버튼 그룹 */}
+        <div className="fixed top-4 right-4 z-50 flex flex-col space-y-2">
+          {/* 결과 보기 버튼 */}
+          <button
+            onClick={() => {
+              setShowEndPointModal(false);
+              setTimeout(() => setShowEndPointModal(true), 100);
+            }}
+            className="px-4 py-2 bg-orange-400 text-white font-bold rounded-lg shadow-md"
+          >
+            결과 보기
+          </button>
+
+          {/* 고양이 달리기 버튼 */}
+          <button
+            onClick={() => setCatRun(true)}
+            className="px-4 py-2 bg-blue-400 text-white font-bold rounded-lg shadow-md"
+          >
+            고양이 달리기
+          </button>
+
+          {/* 게임 종료 버튼 추가 */}
+          <button
+            onClick={handleClickFinish}
+            className="px-4 py-2 bg-red-500 text-white font-bold rounded-lg shadow-md"
+          >
+            게임 종료
+          </button>
+        </div>
 
         {/* 중앙 타이핑 영역 */}
       <div className="w-full flex flex-col items-center space-y-4 px-[5%]">
@@ -180,25 +209,6 @@ function Layout({
 
         <div style={{ height: "70" }}></div>
         <br /><br /><br />
-
-        {/* 테스트용 결과 보기 버튼 */}
-        <div className="fixed top-4 right-4 z-50">
-          <button
-            onClick={() => {
-              setShowEndPointModal(false);
-              setTimeout(() => setShowEndPointModal(true), 100); // 항상 새로 띄우게 강제 리셋
-            }}
-            className="px-4 py-2 bg-orange-400 text-white font-bold rounded-lg shadow-md"
-          >
-            결과 보기
-          </button>
-          <button
-            onClick={() => setCatRun(true)}
-            className="mt-2 px-4 py-2 bg-blue-400 text-white font-bold rounded-lg shadow-md"
-          >
-            고양이 달리기
-          </button>
-        </div>
 
         {showEndPointModal && (
           <div className="absolute top-0 left-0 w-full flex justify-center items-center z-50">
