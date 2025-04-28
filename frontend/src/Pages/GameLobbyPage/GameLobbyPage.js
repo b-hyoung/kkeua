@@ -292,6 +292,10 @@ function GameLobbyPage() {
       console.log("🎮 게임 상태가 'playing'으로 감지됨 -> 게임페이지 이동 준비 중");
       setRedirectingToGame(true);
       setTimeout(() => {
+        if (disconnect) {
+          console.log("게임 시작 전: 웹소켓 연결 종료 시도");
+          disconnect();
+        }
         console.log("🕹️ navigate 실행");
         navigate(gameUrl(roomId));
       }, 2500);
@@ -314,6 +318,10 @@ function GameLobbyPage() {
         console.log("👾 참가자 중 'playing' 상태 발견 -> 2초 메세지 후 게임 페이지로 이동");
         setShowRedirectMessage(true);
         setTimeout(() => {
+          if (disconnect) {
+            console.log("참가자 준비 완료 감지: 웹소켓 연결 종료 시도");
+            disconnect();
+          }
           navigate(gameUrl(roomId));
         }, 2000);
       }
