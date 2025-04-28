@@ -140,33 +140,67 @@ useEffect(() => {
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [lastCharacter, setLastCharacter] = useState('');
   
-  useEffect(() => {
-    async function prepareGuestAndConnect() {
-      try {
-        let guestUuid = document.cookie
+useEffect(() => {
+  async function prepareGuestAndConnect() {
+    try {
+      let attempts = 0;
+      let guestUuid = null;
+
+      while (attempts < 2) {
+        guestUuid = document.cookie
           .split('; ')
           .find(row => row.startsWith('kkua_guest_uuid='))
           ?.split('=')[1];
-  
-        if (!guestUuid) {
-          const loginRes = await axiosInstance.post('/guests/login');
-          guestUuid = loginRes.data.uuid;
-          document.cookie = `kkua_guest_uuid=${guestUuid}; path=/`;
-        }
-  
-        connectSocket(gameid);
-  
-      } catch (error) {
-        console.error("❌ 방 입장 또는 소켓 연결 실패:", error.response?.data || error.message);
-        alert("방 입장 실패 또는 서버 연결 실패");
-        navigate("/");
+
+        if (guestUuid) break; // ✅ 쿠키 있으면 바로 탈출
+
+        // ✨ 쿠키 없으면 게스트 로그인 시도
+        const loginRes = await axiosInstance.post('/guests/login');
+        guestUuid = loginRes.data.uuid;
+        document.cookie = `kkua_guest_uuid=${guestUuid}; path=/`;
+
+        // 약간 대기 시간 주기
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        attempts++;
       }
+
+      // 최종 guestUuid 다시 체크
+      guestUuid = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('kkua_guest_uuid='))
+        ?.split('=')[1];
+
+      if (!guestUuid) {
+        throw new Error("🚫 쿠키 세팅 실패: guestUuid 없음");
+      }
+
+      connectSocket(gameid);
+
+        // ✅ 안전 전송 준비: 소켓 readyState 감시
+        const waitForSocketConnection = (callback) => {
+          const socket = getSocket();
+          if (!socket) return console.error("❌ 소켓 없음");
+
+          if (socket.readyState === WebSocket.OPEN) {
+            callback();
+          } else {
+            console.log('⏳ 소켓 연결 대기중...');
+            setTimeout(() => waitForSocketConnection(callback), 100); // 0.1초 간격 재시도
+          }
+        };
+
+    } catch (error) {
+      console.error("❌ 방 입장 또는 소켓 연결 실패:", error.response?.data || error.message);
+      alert("방 입장 실패 또는 서버 연결 실패");
+      navigate("/");
     }
-  
-    if (gameid) {
-      prepareGuestAndConnect();
-    }
-  }, [gameid, navigate]);
+  }
+
+  if (gameid) {
+    prepareGuestAndConnect();
+  }
+}, [gameid, navigate]);
   
 
   // 나머지 게임 로직은 기존 그대로 ↓↓↓
@@ -257,6 +291,20 @@ useEffect(() => {
     navigate(gameLobbyUrl(gameid));
   };
 
+useEffect(() => {
+  // ✅ 참가자 없으면 2초 후 자동 갱신 재요청
+  if (socketParticipants.length === 0) {
+    const retry = setTimeout(() => {
+      const socket = getSocket();
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "request_participants" }));
+        console.log('🔄 참가자 리스트 갱신 요청 보냄');
+      }
+    }, 2000);
+    return () => clearTimeout(retry);
+  }
+}, [socketParticipants]);
+
   return (
     <>
       <Layout
@@ -336,3 +384,4 @@ useEffect(() => {
 }
 
 export default InGame;
+

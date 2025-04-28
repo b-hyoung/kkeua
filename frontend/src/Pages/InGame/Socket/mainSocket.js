@@ -79,6 +79,9 @@ export function connectSocket(gameId) {
 
     socket.onclose = (e) => {
       console.warn(`❌ WebSocket 끊김: code=${e.code}, reason=${e.reason}`);
+      if (e.code === 4003) {
+        alert("⚠️ 서버 오류로 연결이 끊어졌습니다. 잠시 후 다시 시도해주세요.");
+      }
       socket = null;
     };
 
