@@ -72,6 +72,9 @@ useEffect(() => {
       console.log('🏁 게임 종료 알림 수신:', data);
       setGameEnded(true);
       setShowEndPointModal(true);
+      setTimeout(() => {
+        handleMoveToLobby();
+      }, 5000);
     }
   });
 }, []);
@@ -236,6 +239,9 @@ useEffect(() => {
       requestEndWordChainGame();
       setShowEndPointModal(false);
       setTimeout(() => setShowEndPointModal(true), 100); // 결과 모달 강제 띄우기
+      setTimeout(() => {
+        handleMoveToLobby();
+      }, 5000);
     } catch (error) {
       console.log(error)
       alert("종료된 게임이 아닙니다.");
@@ -281,6 +287,7 @@ useEffect(() => {
         frozenTime={frozenTime}
         isPlaying={gameStatus === 'playing'}
         isGameEnded={gameEnded}
+        gameid={gameid}
       />
       <div className="w-full max-w-md mx-auto mt-4 p-2 bg-gray-100 rounded-lg shadow">
         <h2 className="text-center font-bold mb-2">📤 전송한 메시지</h2>

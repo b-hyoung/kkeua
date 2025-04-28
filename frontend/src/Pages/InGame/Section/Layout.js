@@ -6,6 +6,7 @@ import Timer from './Timer';
 import msgData from './MsgData';
 import { workingCatImg } from '../../../Component/imgUrl';
 import EndPointModal from './EndPointModal';
+import { gameLobbyUrl } from '../../../Component/urls';
 
 function ProgressBar({ inputTimeLeft }) {
   return (
@@ -55,9 +56,10 @@ function Layout({
   finalResults, // Added finalResults prop
   usedLog, // Added usedLog prop
   reactionTimes, // Added reactionTimes prop
-  handleClickFinish // <-- Add this line
+  handleClickFinish, // <-- Add this line
+  gameid //gameid
 }) {
-
+  
   useEffect(() => {
     window.setInputTimeLeftFromSocket = (time) => {
       setInputTimeLeft(time);
@@ -210,16 +212,19 @@ function Layout({
         <div style={{ height: "70" }}></div>
         <br /><br /><br />
 
-        {showEndPointModal && (
-          <div className="absolute top-0 left-0 w-full flex justify-center items-center z-50">
-            <EndPointModal
-              players={(socketParticipants.length > 0 ? socketParticipants.map(p => p.nickname) : players)}
-              onClose={() => setShowEndPointModal(false)}
-              usedLog={usedLog}
-              reactionTimes={reactionTimes}
-            />
-          </div>
-        )}
+        {showEndPointModal && (() => {
+         
+          return (
+            <div className="absolute top-0 left-0 w-full flex justify-center items-center z-50">
+              <EndPointModal
+                players={(socketParticipants.length > 0 ? socketParticipants.map(p => p.nickname) : players)}
+                onClose={() => setShowEndPointModal(false)}
+                usedLog={usedLog}
+                reactionTimes={reactionTimes}
+              />
+            </div>
+          );
+        })()}
 
         {/* 하단 입력창 */}
         <div className="w-full fixed bottom-0 bg-white z-50 border-t border-gray">
