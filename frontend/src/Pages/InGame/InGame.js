@@ -57,10 +57,6 @@ useEffect(() => {
       console.log('✅ 유효한 단어 수신:', data.word);
 
       setItemList(prev => {
-        if (prev.find(item => item.word === data.word)) {
-          console.log('🔁 이미 존재하는 단어. 추가 안함:', data.word);
-          return prev;
-        }
         const updated = [{ word: data.word, desc: data.meaning || "유효한 단어입니다." }, ...prev];
         console.log('🆕 업데이트된 itemList:', updated);
         return updated;
@@ -114,7 +110,7 @@ useEffect(() => {
 
   const [inputValue, setInputValue] = useState('');
   const [message, setMessage] = useState('');
-  const [showCount, setShowCount] = useState(3);
+  const [showCount, setShowCount] = useState(5);
 
   // 애니메이션 상태
   const [typingText, setTypingText] = useState('');
@@ -176,6 +172,8 @@ useEffect(() => {
       }
 
       connectSocket(gameid);
+      // 소켓 연결 후 3초 대기 (딜레이를 3초 주는 코드)
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
         // ✅ 안전 전송 준비: 소켓 readyState 감시
         const waitForSocketConnection = (callback) => {
@@ -230,7 +228,10 @@ useEffect(() => {
   };
 
   useEffect(() => {
-    const updateCount = () => setShowCount(window.innerWidth >= 1024 ? 4 : 3);
+    // 모바일은 3개, PC는 4개 보여주게 함
+    const updateCount = () => {
+      setShowCount(window.innerWidth >= 400 ? 4 : 3);
+    };
     updateCount();
     window.addEventListener('resize', updateCount);
     return () => window.removeEventListener('resize', updateCount);
@@ -305,6 +306,17 @@ useEffect(() => {
   }
 }, [socketParticipants]);
 
+  // 소켓 언마운트 정리 useEffect 추가
+  useEffect(() => {
+    return () => {
+      const socket = getSocket();
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.close();
+        console.log('✅ [InGame] 언마운트 시 소켓 정상 종료');
+      }
+    };
+  }, []);
+
   return (
     <>
       <Layout
@@ -340,7 +352,20 @@ useEffect(() => {
       <div className="w-full max-w-md mx-auto mt-4 p-2 bg-gray-100 rounded-lg shadow">
         <h2 className="text-center font-bold mb-2">📤 전송한 메시지</h2>
         <div className="space-y-1 max-h-[200px] overflow-y-auto">
-       
+          {itemList.length > 0 && (
+            <div className="p-4 rounded-2xl border shadow-lg bg-white border-gray-300 drop-shadow-md mx-auto">
+              <div className="flex items-center space-x-4 ml-2">
+                <div className="w-8 h-8 bg-blue-400 rounded-full"></div>
+                <span className="font-semibold text-lg text-black">
+                  {itemList[0].word.slice(0, -1)}
+                  <span className="text-red-500">{itemList[0].word.charAt(itemList[0].word.length - 1)}</span>
+                </span>
+              </div>
+              <div className="text-gray-500 text-sm ml-2 mt-2 break-words max-w-md text-left">
+                {itemList[0].desc}
+              </div>
+            </div>
+          )}
         </div>
       </div>
       {socketParticipants.length > 0 && guestStore.getState().guest_id === socketParticipants.find(p => p.is_owner)?.guest_id && (
@@ -384,4 +409,3 @@ useEffect(() => {
 }
 
 export default InGame;
-

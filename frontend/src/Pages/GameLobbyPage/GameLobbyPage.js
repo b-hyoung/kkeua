@@ -291,12 +291,12 @@ function GameLobbyPage() {
     if (gameStatus && typeof gameStatus === 'string' && gameStatus.toLowerCase() === 'playing') {
       console.log("🎮 게임 상태가 'playing'으로 감지됨 -> 게임페이지 이동 준비 중");
       setRedirectingToGame(true);
+      if (disconnect) {
+        console.log("게임 시작 전: 웹소켓 연결 종료 시도");
+        disconnect();
+      }
+      console.log("🕹️ navigate 실행");
       setTimeout(() => {
-        if (disconnect) {
-          console.log("게임 시작 전: 웹소켓 연결 종료 시도");
-          disconnect();
-        }
-        console.log("🕹️ navigate 실행");
         navigate(gameUrl(roomId));
       }, 2500);
     }

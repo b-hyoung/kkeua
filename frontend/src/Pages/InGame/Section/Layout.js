@@ -37,6 +37,7 @@ function Layout({
   handleTypingDone,
   message,
   itemList,
+  setItemList, // <-- 추가
   showCount,
   players,
   specialPlayer,
@@ -59,6 +60,30 @@ function Layout({
   handleClickFinish, // <-- Add this line
   gameid //gameid
 }) {
+  useEffect(() => {
+    if (!window.wordSocket) return;
+
+    const handleWordValidation = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.type === "word_validation_result" && data.valid) {
+          setItemList(prev => {
+            const alreadyExists = prev.some(item => item.word === data.word);
+            if (alreadyExists) return prev;
+            return [{ word: data.word, desc: data.meaning }, ...prev];
+          });
+        }
+      } catch (error) {
+        console.error("Failed to parse word validation result", error);
+      }
+    };
+
+    window.wordSocket.addEventListener("message", handleWordValidation);
+
+    return () => {
+      window.wordSocket.removeEventListener("message", handleWordValidation);
+    };
+  }, [window.wordSocket]);
   
   useEffect(() => {
     window.setInputTimeLeftFromSocket = (time) => {
@@ -129,9 +154,13 @@ function Layout({
         <div className="w-full max-w-sm p-4 border-4 border-orange-400 rounded-full text-center font-bold shadow-lg bg-white text-xl leading-tight h-16 flex flex-col justify-center">
           {/* 항상 보이는 제시어 */}
           <div className="text-orange-500 text-lg">
-            {quizMsg.length > 1 && !msgData.find(item => item.word === quizMsg)
-              ? quizMsg
-              : quizMsg.charAt(quizMsg.length - 1)}
+            {itemList.length > 0 ? (
+              itemList[0].word.charAt(itemList[0].word.length - 1)
+            ) : (
+              quizMsg.length > 1 && !msgData.find(item => item.word === quizMsg)
+                ? quizMsg
+                : quizMsg.charAt(quizMsg.length - 1)
+            )}
           </div>
 
           {/* 애니메이션 메시지 */}
@@ -146,16 +175,19 @@ function Layout({
         </div>
 
           <div className="w-full md:w-[750px] px-2 md:px-4 space-y-4 tracking-wide">
-            <div className="bg-gray-100 p-6 rounded-xl space-y-4 pb-10 mb-2 min-h-[480px]">
-              {itemList.length === 0 ? (
-                <div className="text-center text-gray-400">🎮 게임이 시작되면 여기에 단어가 나타납니다!</div>
-              ) : (
-                itemList.slice(-showCount).map((item, index) => (
+          <div className="flex flex-col-reverse bg-gray-100 p-6 rounded-xl space-y-4 pb-10 mb-2 min-h-[480px] overflow-y-auto max-h-[480px]">
+            {itemList.length === 0 ? (
+              <div className="text-center text-gray-400">🎮 게임이 시작되면 여기에 단어가 나타납니다!</div>
+            ) : (
+              [...itemList]
+                .slice(0, showCount) // 가장 최근에 친 단어 showCount개만 보여줌
+                .map((item, index) => (
                   <div key={index} className="p-4 rounded-2xl border shadow-lg bg-white border-gray-300 drop-shadow-md mx-auto">
                     <div className="flex items-center space-x-4 ml-2">
                       <div className={`w-8 h-8 ${index === 0 ? 'bg-blue-400' : index === 1 ? 'bg-green-400' : 'bg-purple-400'} rounded-full`}></div>
                       <span className="font-semibold text-lg text-black">
-                        {item.word.slice(0, -1)}<span className="text-red-500">{item.word.charAt(item.word.length - 1)}</span>
+                        {item.word.slice(0, -1)}
+                        <span className="text-red-500">{item.word.charAt(item.word.length - 1)}</span>
                       </span>
                     </div>
                     <div className="text-gray-500 text-sm ml-2 mt-2 break-words max-w-md text-left">
@@ -163,8 +195,8 @@ function Layout({
                     </div>
                   </div>
                 ))
-              )}
-            </div>
+            )}
+          </div>
           </div>
         </div>
 
