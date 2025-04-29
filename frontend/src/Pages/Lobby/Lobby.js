@@ -209,7 +209,6 @@ function Lobby() {
   //Refresh BTN
   const handleClickRefresh = () => {
     fetchRoom()
-    alert("새 정보를 가져옵니다.");
   }
 
   return (

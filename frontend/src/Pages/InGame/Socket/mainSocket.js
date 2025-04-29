@@ -1,3 +1,5 @@
+// 현재 턴 플레이어의 guest_id 저장
+export let currentPlayerId = null;
 let socket = null;
 let receiveWordHandler = null; // (⭐) 외부 핸들러 저장
 
@@ -64,6 +66,20 @@ export function connectSocket(gameId) {
 
       if (wordChainRelevantTypes.includes(data.type)) {
         console.log(`✅ [끝말잇기] 타입 수신: ${data.type}`, data);
+        if (data.type === "word_chain_state" && data.current_player_id) {
+            currentPlayerId = data.current_player_id;
+            console.log("🎯 현재 턴 플레이어 ID 업데이트:", currentPlayerId);
+        }
+        // === 추가: word_chain_started 수신 시 currentPlayerId 설정 ===
+        if (data.type === "word_chain_started" && data.current_player_id !== undefined && data.current_player_id !== null) {
+          currentPlayerId = data.current_player_id;
+          console.log("🎯 게임 시작 - 현재 턴 플레이어 ID 설정:", currentPlayerId);
+        }
+        // === 추가: word_chain_word_submitted 수신 시 currentPlayerId를 next_turn_guest_id로 변경 ===
+        if (data.type === "word_chain_word_submitted" && data.next_turn_guest_id !== undefined && data.next_turn_guest_id !== null) {
+          currentPlayerId = data.next_turn_guest_id;
+          console.log("🎯 단어 제출 완료 - 다음 턴으로 변경:", currentPlayerId);
+        }
         if (receiveWordHandler) {
           receiveWordHandler(data);
         }
@@ -101,15 +117,20 @@ export function getSocket() {
 }
 
 
-// ✅ 최소 추가: 끝말잇기 단어 제출
-export function submitWordChainWord(word) {
+export function submitWordChainWord(word, myGuestId, currentTurnGuestId) {
   if (socket && socket.readyState === WebSocket.OPEN) {
+    if (currentTurnGuestId !== null && myGuestId !== currentTurnGuestId) {
+      console.warn("🚫 현재 당신 턴이 아닙니다. 제출 금지.");
+      showTurnWarning(); 
+      return;
+    }
     socket.send(JSON.stringify({
       type: "word_chain",
       action: "validate_word",
       word: word
     }));
-  }}
+  }
+}
 // ✅ 최소 추가: 끝말잇기 게임 시작 요청
 export function requestStartWordChainGame(firstWord = "끝말잇기") {
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -131,4 +152,28 @@ export function requestEndWordChainGame() {
     }));
     console.log('🏁 [끝말잇기] 게임 종료 요청 보냄');
   }
+}
+
+// ✅ 턴이 아닐 때 경고 알림
+function showTurnWarning() {
+  alert("⛔ 현재 당신의 차례가 아닙니다!");
+}
+// ✅ 턴 넘기기 요청 함수 추가
+export function requestSkipTurn() {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: "word_chain",
+      action: "skip_turn"
+    }));
+    console.log('⏩ [끝말잇기] 턴 넘기기 요청 보냄');
+  }
+}
+//현재 누구 턴?
+export function getCurrentTurnGuestId() {
+  // 현재 값이 null이면 서버에 요청
+  if (currentPlayerId === null && socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ type: "request_current_turn" }));
+    console.log("📤 [클라] request_current_turn 요청 보냄");
+  }
+  return currentPlayerId;
 }

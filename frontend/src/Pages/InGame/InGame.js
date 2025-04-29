@@ -11,8 +11,9 @@ import EndPointModal from './Section/EndPointModal';
 import useGameRoomSocket from '../../hooks/useGameRoomSocket';
 import userIsTrue from '../../Component/userIsTrue';
 import guestStore from '../../store/guestStore';
+import { getCurrentTurnGuestId } from './Socket/mainSocket';
 
-import { connectSocket, getSocket, setReceiveWordHandler, submitWordChainWord, requestStartWordChainGame, requestEndWordChainGame } from './Socket/mainSocket';
+import { connectSocket, getSocket, setReceiveWordHandler, submitWordChainWord, requestStartWordChainGame, requestEndWordChainGame, requestSkipTurn } from './Socket/mainSocket';
 import { sendWordToServer } from './Socket/kdataSocket';
 // import { submitWordChainWord, requestStartWordChainGame } from './Socket/mainSocket'; // ✅ 끝말잇기 소켓 헬퍼 불러오기
 
@@ -24,20 +25,24 @@ function InGame() {
   const { gameid } = useParams();
   const navigate = useNavigate();
   const [gameEnded, setGameEnded] = useState(false);
+  const [gameStarted, setGameStarted] = useState(false);
+
+  const [currentTurnGuestId, setCurrentTurnGuestId] = useState(null);
 
   // 퀴즈 제시어 
 
   const {
     participants: socketParticipants,
     gameStatus,
-    isReady,
-    toggleReady,
-    updateStatus,
-    roomUpdated,
-    setRoomUpdated,
     finalResults,
-    setFinalResults
   } = useGameRoomSocket(gameid);
+
+  useEffect(() => {
+    if (gameStatus === 'playing' && currentTurnGuestId !== null) {
+      console.log('✅ 현재 방 상태가 playing이고, currentTurnGuestId도 있음! => gameStarted true로 세팅');
+      setGameStarted(true);
+    }
+  }, [gameStatus, currentTurnGuestId]);
 
   const [showEndPointModal, setShowEndPointModal] = useState(false);
 
@@ -50,17 +55,42 @@ function InGame() {
 
 useEffect(() => {
   setReceiveWordHandler((data) => {
+    setGameStarted(true);
+    console.log("🛬 소켓 데이터 수신:", data);
     console.log("💬 서버에서 수신:", data);
-
     // ✅ 오직 'word_validation_result' + valid: true 인 경우만 처리
     if (data.type === "word_validation_result" && data.valid) {
       console.log('✅ 유효한 단어 수신:', data.word);
 
       setItemList(prev => {
+        if (prev.find(item => item.word === data.word)) return prev;
         const updated = [{ word: data.word, desc: data.meaning || "유효한 단어입니다." }, ...prev];
-        console.log('🆕 업데이트된 itemList:', updated);
+        console.log('🆕 [수정] 업데이트된 itemList:', updated);
         return updated;
       });
+      // Note: The frontend expects the server to send a "word_chain_word_submitted" event
+      // with 'next_turn_guest_id' to properly update the turn after a valid word submission.
+    }
+
+    // 🔄 word_chain_started 처리 (업데이트)
+    if (data.type === "word_chain_started") {
+      console.log('✅ [InGame] word_chain_started 처리 완료 - 현재 턴은:', getCurrentTurnGuestId());
+      setCurrentTurnGuestId(getCurrentTurnGuestId());
+    }
+
+    // ✅ 서버에서 현재 턴 정보 응답 시 처리
+    if (data.type === "word_chain_state" && data.current_player_id !== undefined && data.current_player_id !== null) {
+      console.log('✅ [InGame] word_chain_state로 현재 턴 정보 수신:', data.current_player_id);
+      setCurrentTurnGuestId(data.current_player_id);
+    }
+
+    if (data.type === "word_chain_word_submitted") {
+      if (data.next_turn_guest_id !== undefined && data.next_turn_guest_id !== null) {
+        console.log('🎯 단어 제출 완료 - 다음 턴:', data.next_turn_guest_id);
+        setCurrentTurnGuestId(data.next_turn_guest_id);
+      } else {
+        console.error('🚫 [word_chain_word_submitted] next_turn_guest_id 없음!');
+      }
     }
 
     // 🔥 추가: 게임 종료 브로드캐스트 받으면 모달 열기
@@ -172,6 +202,8 @@ useEffect(() => {
       }
 
       connectSocket(gameid);
+      await new Promise(resolve => setTimeout(resolve, 1000)); 
+      getCurrentTurnGuestId();
       // 소켓 연결 후 3초 대기 (딜레이를 3초 주는 코드)
       await new Promise(resolve => setTimeout(resolve, 3000));
 
@@ -254,10 +286,32 @@ useEffect(() => {
     }
   }, [inputTimeLeft, inputValue, typingText, timeLeft, resetTimer]);
 
-  // ✅ 단어 제출 함수
+  // ✅ 단어 제출 함수 (더 안전하게 participant/turn 체크)
   const handleSubmitWord = () => {
+    if (!gameStarted) {
+      alert('⛔ 게임이 아직 시작되지 않았습니다.');
+      return;
+    }
+    console.log("🚥 내 guest_id:", guestStore.getState().guest_id);
+    console.log("🚥 현재 currentTurnGuestId:", currentTurnGuestId);
+
+    if (socketParticipants.length === 0) {
+      alert('⛔ 참가자 정보가 아직 없습니다.');
+      return;
+    }
+
+    if (currentTurnGuestId === null) {
+      alert('⛔ 아직 게임 시작 전이거나 턴 정보가 없습니다.');
+      return;
+    }
+
+    if (guestStore.getState().guest_id !== currentTurnGuestId) {
+      alert('⛔ 현재 당신 차례가 아닙니다.');
+      return;
+    }
+
     if (inputValue.trim() !== '') {
-      submitWordChainWord(inputValue.trim());
+      submitWordChainWord(inputValue.trim(), guestStore.getState().guest_id, currentTurnGuestId);
       setInputValue('');
     }
   };
@@ -306,6 +360,18 @@ useEffect(() => {
   }
 }, [socketParticipants]);
 
+// ✅ 방장 기준으로 currentTurnGuestId 강제 세팅 (최적화)
+useEffect(() => {
+  if (!gameStarted && socketParticipants.length > 0 && currentTurnGuestId === null) {
+    const owner = socketParticipants.find(p => p.is_owner);
+    if (owner) {
+      console.log("🚀 [최적화] 방장 guest_id를 currentTurnGuestId로 강제 세팅:", owner.guest_id);
+      setCurrentTurnGuestId(owner.guest_id);
+      setGameStarted(true); // 게임 시작 플래그도 함께 세팅
+    }
+  }
+}, [socketParticipants, currentTurnGuestId, gameStarted]);
+
   // 소켓 언마운트 정리 useEffect 추가
   useEffect(() => {
     return () => {
@@ -348,6 +414,8 @@ useEffect(() => {
         isPlaying={gameStatus === 'playing'}
         isGameEnded={gameEnded}
         gameid={gameid}
+        currentTurnGuestId={currentTurnGuestId}
+        myGuestId={guestStore.getState().guest_id}
       />
       <div className="w-full max-w-md mx-auto mt-4 p-2 bg-gray-100 rounded-lg shadow">
         <h2 className="text-center font-bold mb-2">📤 전송한 메시지</h2>
@@ -376,6 +444,14 @@ useEffect(() => {
           >
             게임 시작
           </button>
+          <button
+  onClick={() => {
+    requestSkipTurn();  // ✅ 소켓으로 턴 넘기기 요청
+  }}
+  className="bg-yellow-400 text-black px-4 py-2 rounded-lg shadow hover:bg-yellow-500 transition"
+>
+  턴 넘기기
+</button>
         </div>
       )}
       {socketParticipants.length > 0 && guestStore.getState().guest_id !== socketParticipants.find(p => p.is_owner)?.guest_id && (

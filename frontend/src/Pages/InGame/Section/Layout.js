@@ -58,7 +58,9 @@ function Layout({
   usedLog, // Added usedLog prop
   reactionTimes, // Added reactionTimes prop
   handleClickFinish, // <-- Add this line
-  gameid //gameid
+  gameid, //gameid
+  currentTurnGuestId, // Added currentTurnGuestId prop
+  myGuestId // Added myGuestId prop
 }) {
   useEffect(() => {
     if (!window.wordSocket) return;
@@ -68,9 +70,8 @@ function Layout({
         const data = JSON.parse(e.data);
         if (data.type === "word_validation_result" && data.valid) {
           setItemList(prev => {
-            const alreadyExists = prev.some(item => item.word === data.word);
-            if (alreadyExists) return prev;
-            return [{ word: data.word, desc: data.meaning }, ...prev];
+            if (prev.find(item => item.word === data.word)) return prev;
+            return [{ word: data.word, desc: data.meaning || "유효한 단어입니다." }, ...prev];
           });
         }
       } catch (error) {
@@ -205,9 +206,10 @@ function Layout({
           <div className="grid grid-cols-2 md:grid-cols-1 gap-6 place-items-center max-w-fit">
             {players.map((player, index) => {
               const currentGuest = guestStore.getState();
-              const isMyself = currentGuest.nickname === player;
+              const isMyself = currentGuest === player || currentGuest.guest_id === player.guest_id;
+              const isCurrentTurn = player.guest_id === currentTurnGuestId;
               return (
-                <div key={index} className="flex flex-col items-center space-y-2">
+                <div key={index} className={`flex flex-col items-center space-y-2 ${isCurrentTurn ? 'bg-yellow-200' : ''}`}>
                   <div className={`flex flex-col items-center w-[220px] px-2 py-2 rounded-lg border-[3px] font-bold text-base space-y-2 ${
                     player === specialPlayer
                       ? 'bg-orange-100 border-orange-400 text-orange-500'
@@ -249,7 +251,7 @@ function Layout({
           return (
             <div className="absolute top-0 left-0 w-full flex justify-center items-center z-50">
               <EndPointModal
-                players={(socketParticipants.length > 0 ? socketParticipants.map(p => p.nickname) : players)}
+                players={(socketParticipants.length > 0 ? socketParticipants.map(p => p) : players)}
                 onClose={() => setShowEndPointModal(false)}
                 usedLog={usedLog}
                 reactionTimes={reactionTimes}
@@ -268,9 +270,14 @@ function Layout({
             <span className="font-bold">⇈</span>
             <input
               type="text"
-              className="flex-1 p-2 h-12 border rounded-lg focus:outline-none text-lg"
+              className={`flex-1 p-2 h-12 border rounded-lg focus:outline-none text-lg ${
+                currentTurnGuestId !== null && Number(myGuestId) !== Number(currentTurnGuestId)
+                  ? 'bg-gray-200'
+                  : ''
+              }`}
               placeholder="즐거운 끄아와"
               value={inputValue}
+              disabled={currentTurnGuestId !== null && Number(myGuestId) !== Number(currentTurnGuestId)}
               onChange={(e) => {
                 if (!typingText) {
                   setInputValue(e.target.value);
