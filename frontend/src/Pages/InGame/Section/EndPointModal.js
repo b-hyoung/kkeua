@@ -5,10 +5,13 @@ function EndPointModal({ players, onClose, usedLog, reactionTimes }) {
 
   useEffect(() => {
     if (players.length > 0 && ranks.length === 0) {
-      const sortedPlayers = [...players].map((player) => ({
-        nickname: player,
-        score: Math.floor(Math.random() * 100), // 임시 점수 생성
-      }))
+      const sortedPlayers = [...players].map((player) => {
+        const nickname = typeof player === 'string' ? player : player.nickname; // ✅ 문자열/객체 구분
+        return {
+          nickname,
+          score: Math.floor(Math.random() * 100), // 임시 점수
+        };
+      })
         .sort((a, b) => b.score - a.score)
         .map((player, index) => ({
           ...player,
