@@ -62,29 +62,6 @@ function Layout({
   currentTurnGuestId, // Added currentTurnGuestId prop
   myGuestId // Added myGuestId prop
 }) {
-  useEffect(() => {
-    if (!window.wordSocket) return;
-
-    const handleWordValidation = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.type === "word_validation_result" && data.valid) {
-          setItemList(prev => {
-            if (prev.find(item => item.word === data.word)) return prev;
-            return [{ word: data.word, desc: data.meaning || "유효한 단어입니다." }, ...prev];
-          });
-        }
-      } catch (error) {
-        console.error("Failed to parse word validation result", error);
-      }
-    };
-
-    window.wordSocket.addEventListener("message", handleWordValidation);
-
-    return () => {
-      window.wordSocket.removeEventListener("message", handleWordValidation);
-    };
-  }, [window.wordSocket]);
   
   useEffect(() => {
     window.setInputTimeLeftFromSocket = (time) => {

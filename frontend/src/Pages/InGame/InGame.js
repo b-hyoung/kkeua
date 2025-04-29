@@ -11,7 +11,7 @@ import EndPointModal from './Section/EndPointModal';
 import useGameRoomSocket from '../../hooks/useGameRoomSocket';
 import userIsTrue from '../../Component/userIsTrue';
 import guestStore from '../../store/guestStore';
-import { getCurrentTurnGuestId } from './Socket/mainSocket';
+import { getCurrentTurnGuestId, requestCurrentTurn } from './Socket/mainSocket';
 
 import { connectSocket, getSocket, setReceiveWordHandler, submitWordChainWord, requestStartWordChainGame, requestEndWordChainGame, requestSkipTurn } from './Socket/mainSocket';
 import { sendWordToServer } from './Socket/kdataSocket';
@@ -74,8 +74,8 @@ useEffect(() => {
 
     // 🔄 word_chain_started 처리 (업데이트)
     if (data.type === "word_chain_started") {
-      console.log('✅ [InGame] word_chain_started 처리 완료 - 현재 턴은:', getCurrentTurnGuestId());
-      setCurrentTurnGuestId(getCurrentTurnGuestId());
+      console.log('✅ [InGame] word_chain_started 처리 완료');
+      requestCurrentTurn();
     }
 
     // ✅ 서버에서 현재 턴 정보 응답 시 처리
@@ -202,8 +202,8 @@ useEffect(() => {
       }
 
       connectSocket(gameid);
-      await new Promise(resolve => setTimeout(resolve, 1000)); 
-      getCurrentTurnGuestId();
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      requestCurrentTurn();
       // 소켓 연결 후 3초 대기 (딜레이를 3초 주는 코드)
       await new Promise(resolve => setTimeout(resolve, 3000));
 

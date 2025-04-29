@@ -168,12 +168,13 @@ export function requestSkipTurn() {
     console.log('⏩ [끝말잇기] 턴 넘기기 요청 보냄');
   }
 }
-//현재 누구 턴?
-export function getCurrentTurnGuestId() {
-  // 현재 값이 null이면 서버에 요청
-  if (currentPlayerId === null && socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ type: "request_current_turn" }));
-    console.log("📤 [클라] request_current_turn 요청 보냄");
+
+export function requestCurrentTurn() {
+  const socket = getSocket();
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({ type: 'request_current_turn' }));
+    console.log('📤 [소켓] 현재 턴 요청 보냄 (request_current_turn)');
+  } else {
+    console.error('❌ 소켓이 열려있지 않아 requestCurrentTurn 실패');
   }
-  return currentPlayerId;
 }
