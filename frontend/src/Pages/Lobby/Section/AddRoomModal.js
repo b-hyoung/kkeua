@@ -31,7 +31,7 @@ function AddRoomModal({ isOpen, isClose }) {
         }
 
         try {
-            console.log("방 생성 요청 경로:", ROOM_API.CREATE_ROOM);
+            console.log("방 생성 요청 경로:", ROOM_API.CREATE_ROOMS);
             console.log("전송 데이터:", {
                 title: roomTitle,
                 max_players: maxPlayers,
@@ -39,7 +39,7 @@ function AddRoomModal({ isOpen, isClose }) {
                 time_limit: timeLimit
             });
 
-            const response = await axiosInstance.post('/gamerooms/', {
+            const response = await axiosInstance.post(ROOM_API.CREATE_ROOMS, {
                 title: roomTitle,
                 max_players: maxPlayers,
                 game_mode: gameMode,
