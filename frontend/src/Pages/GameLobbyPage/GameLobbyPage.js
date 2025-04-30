@@ -58,7 +58,7 @@ function GameLobbyPage() {
         // userIsTrue 호출
         const result = await userIsTrue();
         if (!result) {
-          alert("어멋 어딜들어오세요 Get Out !");
+          alert("로그인 후 진행해주세요");
           navigate("/");
           return;
         }
@@ -85,7 +85,7 @@ function GameLobbyPage() {
   const fetchRoomData = async () => {
     try {
       setIsLoading(true);
-      const response = await axiosInstance.get(`/gamerooms/${roomId}`);
+      const response = await axiosInstance.get(ROOM_API.get_ROOMSID(roomId));
       console.log("방 정보 API 응답:", response.data);
 
       // API 응답 구조 처리
@@ -150,7 +150,7 @@ function GameLobbyPage() {
     // 기존 API 호출 방식으로 확인 (백업)
     const checkIfOwner = async () => {
       try {
-        const response = await axiosInstance.get(`/gamerooms/${roomId}/is-owner`);
+        const response = await axiosInstance.get(ROOM_API.IS_OWNER(roomId));
         console.log("방장 확인 응답:", response.data);
 
         if (response.data.is_owner) {
@@ -171,7 +171,6 @@ function GameLobbyPage() {
 
   /* Exit from Room BTN */
   const handleClickExit = () => {
-    const lobbyUrl = "/lobby";
     
     if (isOwner) {
       let confirmDelete = window.confirm("정말로 방을 삭제하시겠습니까?");
@@ -367,7 +366,6 @@ function GameLobbyPage() {
             guest_id: response.data.guest_id
           });
 
-          console.log("게스트 스토어 업데이트 완료:", guestStore.getState());
         } catch (error) {
           console.error("로그인 실패:", error);
           alert("서버 연결에 문제가 있습니다");
