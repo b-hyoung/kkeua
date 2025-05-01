@@ -250,7 +250,7 @@ function Lobby() {
         {/* 새로고침 안내 (게스트 닉네임 아래 중앙 정렬) */}
         {!modalIsOpen && (
           <div className="hidden md:flex justify-center items-center absolute bottom-[100px] left-1/2 transform -translate-x-1/2 z-50" onClick={handleClickRefresh}>
-            <div className="w-[50px] h-[50px] rounded-full flex items-center justify-center cursor-pointer bg-white shadow-md">
+            <div className="w-[50px] h-[50px] rounded-full flex items-center justify-center cursor-pointer bg-white border border-gray-300">
               <img src={refreshImg} alt="새로고침 아이콘" className="w-6 h-6" />
             </div>
           </div>
@@ -369,7 +369,7 @@ function Lobby() {
 
         {/* 모바일: 방 생성하기 버튼 */}
         <div className="w-full flex justify-center py-4 bg-gray-200 border-gray-300 relative" onClick={(e) => handleClickOpenModal(e)} >
-          <button className="w-full md:w-[80%] flex items-center justify-center gap-2 text-red-400 border-2 rounded-full px-4 py-2 bg-white" style={{ boxShadow: '2px 2px 3px rgba(0, 0, 0, 0.2)'}}>
+          <button className="w-full md:w-[80%] flex items-center justify-center gap-2 text-red-400 border-2 border-[#C0C0C0] rounded-full px-4 py-2 bg-white">
             <img src={addCatImg} className="w-8 h-8" />
             방 생성하기
           </button>
