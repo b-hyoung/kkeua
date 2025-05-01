@@ -30,6 +30,11 @@ function Lobby() {
   const [isEntering, setIsEntering] = useState(false);
 
   const { uuid, nickname,guest_id } = guestStore.getState();
+  const [RoomFilter, setRoomFilter] = useState(false);
+
+  const guestProfileImg = nickname === '특정닉네임' 
+  ? '/imgs/gameBanner.png' 
+  : '/imgs/blogBanner.png';
 
   // 페이지 로드 시 게스트 정보 확인
   useEffect(() => {
@@ -235,25 +240,13 @@ function Lobby() {
         )}
         {/* 중앙 원형 이미지 + 게스트 아이디 */}
         <div className="w-full flex flex-col items-center mt-6 mb-2">
-          <img
+          <img src={guestProfileImg} alt="게스트 프로필"
             className="w-[50px] h-[50px] bg-white rounded-full object-cover mb-2 border border-gray-300"
           />
           <p className="text-lg font-semibold text-gray-700">{nickname || '게스트'}</p>
 
-
-          {/* 모바일: 스와이프 새로고침 안내
-          <div className="md:hidden w-full flex justify-center py-2">
-            <span className="text-sm text-gray-500">위에서 아래로 스와이프 시 새로고침</span>
-          </div>*/}
         </div>
-        {/* 새로고침 안내 (게스트 닉네임 아래 중앙 정렬) 
-        {!modalIsOpen && (
-          <div className="hidden md:flex justify-center items-center absolute bottom-[100px] left-1/2 transform -translate-x-1/2 z-50" onClick={handleClickRefresh}>
-            <div className="w-[50px] h-[50px] rounded-full flex items-center justify-center cursor-pointer bg-white border border-gray-300">
-              <img src={refreshImg} alt="새로고침 아이콘" className="w-6 h-6" />
-            </div>
-          </div>
-        )} */}
+      
         
         {/* 상단 슬라이더 
         
@@ -278,7 +271,15 @@ function Lobby() {
         )}
         */}
         
-        <div className="flex justify-end px-4 md:px-10 mt-2 gap-3 items-center">
+        <div className="flex justify-end px-4 md:px-10 pb-5 mt-2 gap-3 items-center">
+
+        <button
+          className={`text-sm px-4 py-2 rounded-full border font-semibold ${RoomFilter ? 'bg-orange-300 text-white' : 'bg-white text-gray-600'}`}
+          onClick={() => setRoomFilter(prev => !prev)}
+        >
+          입장 가능
+        </button>
+
 
           {/* 랜덤 입장 버튼 */}
           <button
@@ -307,8 +308,15 @@ function Lobby() {
           </>
         ) : null}
         {roomsData.length > 0 && roomsData[0].title !== "" && (
-          <div className="flex-1 overflow-y-auto md:pt-16 text-left space-y-4 px-2 md:px-10 md:pt-16 pb-24 mobile-scroll-hide">
-            {roomsData.map((room, index) => (
+          <div className="flex-1 overflow-y-auto bg-gray-50 md:pt-16 text-left space-y-4 px-2 md:px-10 pb-24 mobile-scroll-hide">
+          {(RoomFilter
+            ? [...roomsData].sort((a, b) => {
+                const aAvailable = a.status === "waiting" && a.participant_count < a.max_players;
+                const bAvailable = b.status === "waiting" && b.participant_count < b.max_players;
+                return bAvailable - aAvailable; // 입장 가능 방 먼저
+              })
+            : roomsData
+          ).map((room, index) => (
             /* 게임리스트 컨테이너 조건부 박스 색상 */
             <div
              key={room.room_id || index}
