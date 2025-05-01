@@ -21,7 +21,12 @@ const time_gauge = 40;
 
 function InGame() {
   const hasConnectedRef = useRef(false);
-  const [itemList, setItemList] = useState([]);
+  const [itemList, setItemList] = useState([]); // submitted word history
+  const [earnedItems, setEarnedItems] = useState([
+    { id: 1, name: '🔥불꽃 아이템', desc: '4글자 단어 입력 보상' },
+    { id: 2, name: '❄️얼음 아이템', desc: '빙결 공격' },
+    { id: 3, name: '⚡번개 아이템', desc: '빠른 입력 보상' }
+  ]); // earned items (not word history)
   const [quizMsg, setQuizMsg] = useState('');
   const { gameid } = useParams();
   const navigate = useNavigate();
@@ -54,195 +59,212 @@ function InGame() {
     }
   };
 
-useEffect(() => {
-  async function prepareGuestAndConnect() {
-    try {
-      let attempts = 0;
-      let guestUuid = null;
+  useEffect(() => {
+    async function prepareGuestAndConnect() {
+      try {
+        let attempts = 0;
+        let guestUuid = null;
 
-      while (attempts < 2) {
+        while (attempts < 2) {
+          guestUuid = document.cookie
+            .split('; ')
+            .find(row => row.startsWith('kkua_guest_uuid='))
+            ?.split('=')[1];
+
+          if (guestUuid) break; // ✅ 쿠키 있으면 바로 탈출
+
+          // ✨ 쿠키 없으면 게스트 로그인 시도
+          const loginRes = await axiosInstance.post('/guests/login');
+          guestUuid = loginRes.data.uuid;
+          document.cookie = `kkua_guest_uuid=${guestUuid}; path=/`;
+
+          // 약간 대기 시간 주기
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          attempts++;
+        }
+
+        // 최종 guestUuid 다시 체크
         guestUuid = document.cookie
           .split('; ')
           .find(row => row.startsWith('kkua_guest_uuid='))
           ?.split('=')[1];
 
-        if (guestUuid) break; // ✅ 쿠키 있으면 바로 탈출
-
-        // ✨ 쿠키 없으면 게스트 로그인 시도
-        const loginRes = await axiosInstance.post('/guests/login');
-        guestUuid = loginRes.data.uuid;
-        document.cookie = `kkua_guest_uuid=${guestUuid}; path=/`;
-
-        // 약간 대기 시간 주기
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        attempts++;
-      }
-
-      // 최종 guestUuid 다시 체크
-      guestUuid = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('kkua_guest_uuid='))
-        ?.split('=')[1];
-
-      if (!guestUuid) {
-        throw new Error("🚫 쿠키 세팅 실패: guestUuid 없음");
-      }
-
-      if (!hasConnectedRef.current) {
-        connectSocket(gameid);
-        hasConnectedRef.current = true;
-      }
-
-      // 🌟 참가자 정보 API 호출
-      try {
-        const res = await axiosInstance.get(ROOM_API.get_ROOMSUSER(gameid));
-        if (res.data && Array.isArray(res.data)) {
-          console.log('🌟 API로 참가자 정보 받아옴:', res.data);
-          setSocketParticipants(res.data);
-          socketParticipantsRef.current(res.data);
-          console.log('🌟 참가자 정보 setSocketParticipants 호출됨 via API');
-          // 👑 방장 정보 추출 및 currentTurnGuestId 업데이트
-          const ownerInfo = res.data.find(p => p.is_creator === true || p.is_creator === "true");
-          if (ownerInfo) {
-            console.log('👑 방장 정보:', ownerInfo);
-            setCurrentTurnGuestId(ownerInfo.guest_id);
-          } else {
-            console.warn('⚠️ 방장 정보 없음 (is_creator가 true인 참가자 없음)', res.data);
-          }
-        } else {
-          console.error('❌ 참가자 API 응답이 예상과 다름:', res.data);
+        if (!guestUuid) {
+          throw new Error("🚫 쿠키 세팅 실패: guestUuid 없음");
         }
-      } catch (error) {
-        console.error('❌ 참가자 API 호출 실패:', error.response?.data || error.message);
-      }
 
-      setReceiveWordHandler((data) => {
-        console.log("🛬 소켓 데이터 수신:", data);
-        switch (data.type) {
-          case "user_joined":
-            console.log("👤 user_joined 수신:", data.data);
-            console.log('📬 [유저 참가] 메시지 수신:', data);
-            break;
-          case "participants_update":
-            console.log('✅ participants_update 수신:', data);
-            console.log('🧩 참가자 목록:', data.participants);
-            if (Array.isArray(data.participants)) {
-              console.log('🎯 participants 배열 길이:', data.participants.length);
-              console.table(data.participants);
-              setSocketParticipants(data.participants);
-              socketParticipantsRef.current(data.participants);
-              // 👑 [참가자 갱신] 방장 정보 추출 및 currentTurnGuestId 업데이트
-              const updatedOwnerInfo = data.participants.find(p => p.is_creator === true || p.is_creator === "true");
-              if (updatedOwnerInfo) {
-                console.log('👑 [참가자 갱신] 방장 정보:', updatedOwnerInfo);
-                setCurrentTurnGuestId(updatedOwnerInfo.guest_id);
-              } else {
-                console.warn('⚠️ [참가자 갱신] 방장 정보 없음', data.participants);
-              }
-              const myGuestId = guestStore.getState().guest_id;
-              const myInfo = data.participants.find(p => p.guest_id === myGuestId);
-              if (!myInfo) {
-                console.warn("⚠️ 현재 사용자 정보를 참가자 목록에서 찾을 수 없습니다. guest_id:", myGuestId);
-              } else {
-                console.log("✅ 현재 사용자 정보:", myInfo);
-              }
+        if (!hasConnectedRef.current) {
+          connectSocket(gameid);
+          hasConnectedRef.current = true;
+        }
+
+        // 🌟 참가자 정보 API 호출
+        try {
+          const res = await axiosInstance.get(ROOM_API.get_ROOMSUSER(gameid));
+          if (res.data && Array.isArray(res.data)) {
+            console.log('🌟 API로 참가자 정보 받아옴:', res.data);
+            setSocketParticipants(res.data);
+            socketParticipantsRef.current(res.data);
+            console.log('🌟 참가자 정보 setSocketParticipants 호출됨 via API');
+            // 👑 방장 정보 추출 및 currentTurnGuestId 업데이트
+            const ownerInfo = res.data.find(p => p.is_creator === true || p.is_creator === "true");
+            if (ownerInfo) {
+              console.log('👑 방장 정보:', ownerInfo);
+              setCurrentTurnGuestId(ownerInfo.guest_id);
             } else {
-              console.error("❌ participants가 배열이 아님!", data.participants);
+              console.warn('⚠️ 방장 정보 없음 (is_creator가 true인 참가자 없음)', res.data);
             }
-            break;
-          case "connected":
-            console.log("✅ connected 수신:", data);
-            console.log('📬 [소켓 연결] 메시지 수신:', data);
-            break;
-          case "word_chain_started":
-            console.log('✅ word_chain_started 수신');
-            if (data.first_word) {
-              setQuizMsg(data.first_word);
-            }
-            setGameStatus('playing');
-            requestCurrentTurn();
-            break;
-          case "word_chain_state":
-            if (data.current_player_id !== undefined) {
-              setCurrentTurnGuestId(data.current_player_id);
-            }
-            break;
-          case "word_validation_result":
-            if (data.valid) {
-              setItemList(prev => {
-                if (prev.find(item => item.word === data.word)) return prev;
-                return [{ word: data.word, desc: data.meaning || "유효한 단어입니다." }, ...prev];
-              });
-            }
-            break;
-          case "word_chain_game_ended":
-            setGameEnded(true);
-            setShowEndPointModal(true);
-            setFinalResults(data.results || []);
-            setGameStatus('ended');
-            setTimeout(() => {
-              handleMoveToLobby();
-            }, 5000);
-            break;
-          case "user_left":
-            console.log("👋 user_left 수신:", data);
-            break;
-          case "error":
-            console.error("❌ 에러 수신:", data.message);
-            break;
-          default:
-            console.warn('📭 처리하지 않는 타입 수신:', data.type, data);
+          } else {
+            console.error('❌ 참가자 API 응답이 예상과 다름:', res.data);
+          }
+        } catch (error) {
+          console.error('❌ 참가자 API 호출 실패:', error.response?.data || error.message);
         }
-      });
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      // ✅ 안전 전송 준비: 소켓 readyState 감시
-      const waitForSocketConnection = (callback) => {
-        const socket = getSocket();
-        if (!socket) return console.error("❌ 소켓 없음");
 
-        if (socket.readyState === WebSocket.OPEN) {
-          callback();
-        } else {
-          console.log('⏳ 소켓 연결 대기중...');
-          setTimeout(() => waitForSocketConnection(callback), 100); // 0.1초 간격 재시도
-        }
-      };
+        setReceiveWordHandler((data) => {
+          console.log("🛬 소켓 데이터 수신:", data);
+          switch (data.type) {
+            case "user_joined":
+              console.log("👤 user_joined 수신:", data.data);
+              console.log('📬 [유저 참가] 메시지 수신:', data);
+              break;
+            case "participants_update":
+              console.log('✅ participants_update 수신:', data);
+              console.log('🧩 참가자 목록:', data.participants);
+              if (Array.isArray(data.participants)) {
+                console.log('🎯 participants 배열 길이:', data.participants.length);
+                console.table(data.participants);
+                setSocketParticipants(data.participants);
+                socketParticipantsRef.current(data.participants);
+                // 👑 [참가자 갱신] 방장 정보 추출 및 currentTurnGuestId 업데이트
+                const updatedOwnerInfo = data.participants.find(p => p.is_creator === true || p.is_creator === "true");
+                if (updatedOwnerInfo) {
+                  console.log('👑 [참가자 갱신] 방장 정보:', updatedOwnerInfo);
+                  setCurrentTurnGuestId(updatedOwnerInfo.guest_id);
+                } else {
+                  console.warn('⚠️ [참가자 갱신] 방장 정보 없음', data.participants);
+                }
+                const myGuestId = guestStore.getState().guest_id;
+                const myInfo = data.participants.find(p => p.guest_id === myGuestId);
+                if (!myInfo) {
+                  console.warn("⚠️ 현재 사용자 정보를 참가자 목록에서 찾을 수 없습니다. guest_id:", myGuestId);
+                } else {
+                  console.log("✅ 현재 사용자 정보:", myInfo);
+                }
+              } else {
+                console.error("❌ participants가 배열이 아님!", data.participants);
+              }
+              break;
+            case "connected":
+              console.log("✅ connected 수신:", data);
+              console.log('📬 [소켓 연결] 메시지 수신:', data);
+              break;
+            case "word_chain_started":
+              console.log('✅ word_chain_started 수신');
+              if (data.first_word) {
+                setQuizMsg(data.first_word);
+              }
+              setGameStatus('playing');
+              requestCurrentTurn();
+              break;
+            case "word_chain_state":
+              if (data.current_player_id !== undefined) {
+                setCurrentTurnGuestId(data.current_player_id);
+              }
+              break;
+            case "word_validation_result":
+              if (data.valid) {
+                setItemList(prev => {
+                  if (prev.find(item => item.word === data.word)) return prev;
+                  return [{ word: data.word, desc: data.meaning || "유효한 단어입니다." }, ...prev];
+                });
+              }
+              break;
+            case "word_chain_game_ended":
+              setGameEnded(true);
+              setShowEndPointModal(true);
+              setFinalResults(data.results || []);
+              setGameStatus('ended');
+              setTimeout(() => {
+                handleMoveToLobby();
+              }, 5000);
+              break;
+            case "user_left":
+              console.log("👋 user_left 수신:", data);
+              break;
+            case "error":
+              console.error("❌ 에러 수신:", data.message);
+              break;
+            default:
+              console.warn('📭 처리하지 않는 타입 수신:', data.type, data);
+          }
+        });
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        // ✅ 안전 전송 준비: 소켓 readyState 감시
+        const waitForSocketConnection = (callback) => {
+          const socket = getSocket();
+          if (!socket) return console.error("❌ 소켓 없음");
 
-      waitForSocketConnection(() => {
-        requestCurrentTurn();
-      });
-      // 소켓 연결 후 3초 대기 (딜레이를 3초 주는 코드)
-      await new Promise(resolve => setTimeout(resolve, 3000));
+          if (socket.readyState === WebSocket.OPEN) {
+            callback();
+          } else {
+            console.log('⏳ 소켓 연결 대기중...');
+            setTimeout(() => waitForSocketConnection(callback), 100); // 0.1초 간격 재시도
+          }
+        };
 
-    } catch (error) {
-      console.error("❌ 방 입장 또는 소켓 연결 실패:", error.response?.data || error.message);
-      alert("방 입장 실패 또는 서버 연결 실패");
-      navigate("/");
+        waitForSocketConnection(() => {
+          requestCurrentTurn();
+        });
+        // 소켓 연결 후 3초 대기 (딜레이를 3초 주는 코드)
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+      } catch (error) {
+        console.error("❌ 방 입장 또는 소켓 연결 실패:", error.response?.data || error.message);
+        alert("방 입장 실패 또는 서버 연결 실패");
+        navigate("/");
+      }
     }
-  }
 
-  if (gameid) {
-    prepareGuestAndConnect();
-  }
-}, [gameid, navigate]);
+    if (gameid) {
+      prepareGuestAndConnect();
+    }
+  }, [gameid, navigate]);
 
   useEffect(() => {
     setRandomQuizWord();
   }, []);
 
+
+  // 테스트용 하드코딩
+  // --------------------------------
   useEffect(() => {
-    if (!quizMsg) return; // quizMsg 없으면 아예 안함
-    const lastChar = quizMsg.charAt(quizMsg.length - 1);
-  
-    // 현재 세팅된 message와 다를 때만 setMessage 호출
-    const expectedMessage = `'${lastChar}'로 시작하는 단어를 입력하세요.`;
-    if (message !== expectedMessage) {
-      setMessage(expectedMessage);
-      console.log(`✅ 시작 안내 메시지 세팅: ${expectedMessage}`);
+    // ✅ 소켓 연결 실패 시 강제로 시작 상태 세팅 (임시 테스트용)
+    if (process.env.NODE_ENV === 'development' && !gameStarted) {
+      console.warn("⚠️ [개발모드] 강제 게임 시작 상태로 진입");
+      setGameStarted(true);
+      setGameStatus('playing');
+      setCurrentTurnGuestId(guestStore.getState().guest_id); // 자신을 턴 주인으로
     }
-  }, [quizMsg]);
-  
+  }, []);
+
+  //----------------------------------
+
+useEffect(() => {
+  if (!quizMsg) return;
+  const lastChar = quizMsg.charAt(quizMsg.length - 1);
+  const expectedMessage = `'${lastChar}'로 시작하는 단어를 입력하세요.`;
+
+  setMessage((prevMsg) => {
+    if (prevMsg !== expectedMessage) {
+      console.log(`✅ 시작 안내 메시지 세팅: ${expectedMessage}`);
+      return expectedMessage;
+    }
+    return prevMsg;
+  });
+}, [quizMsg]);
+
   useEffect(() => {
     const checkGuest = async () => {
       const result = await userIsTrue();
@@ -299,7 +321,7 @@ useEffect(() => {
   const [usedWords, setUsedWords] = useState([]);
   const [currentPlayer, setCurrentPlayer] = useState(null);
   const [lastCharacter, setLastCharacter] = useState('');
-  
+
 
   const handleTypingDone = () => {
     if (!pendingItem) return;
@@ -318,6 +340,9 @@ useEffect(() => {
       word: pendingItem.word,
       itemUsed: false,
     });
+
+    // Example: handle earned item logic here if needed
+    // setEarnedItems(...) if earned items are awarded on typing done
 
     setTypingText('');
     setPendingItem(null);
@@ -377,6 +402,28 @@ useEffect(() => {
 
     if (inputValue.trim() !== '') {
       submitWordChainWord(inputValue.trim(), guestStore.getState().guest_id, currentTurnGuestId);
+
+      // ------------------------------
+      // [Mock] 아이템 드랍 및 UI 업데이트 로직
+      const submittedWord = inputValue.trim();
+      if (submittedWord.length >= 4) {
+        const chance = Math.random();
+        const dropRate = 0.3; // 30% 확률 예시
+        if (chance < dropRate) {
+          const newItem = {
+            id: Date.now(), // 임시 ID
+            name: '🔥불꽃 아이템',
+            desc: `${submittedWord.length}글자 단어 입력 보상`,
+          };
+          console.log('🎁 아이템 획득!', newItem);
+          setEarnedItems(prev => {
+            const updatedList = [newItem, ...prev];
+            return updatedList.slice(0, 4); // 최대 4개까지만 유지
+          }); // 유저 프로필에 해당 아이템 추가
+        }
+      }
+      // ------------------------------
+
       setInputValue('');
     }
   };
@@ -413,37 +460,37 @@ useEffect(() => {
 
 
 
-useEffect(() => {
-  if (!gameStarted && socketParticipants.length > 0 && currentTurnGuestId === null) {
-    const owner = socketParticipants.find(p => p.is_creator === true || p.is_creator === "true");
-    if (owner) {
-      console.log("🚀 [최적화] 방장 guest_id를 currentTurnGuestId로 강제 세팅:", owner.guest_id);
-      setCurrentTurnGuestId(owner.guest_id);
-      setGameStarted(true);
+  useEffect(() => {
+    if (!gameStarted && socketParticipants.length > 0 && currentTurnGuestId === null) {
+      const owner = socketParticipants.find(p => p.is_creator === true || p.is_creator === "true");
+      if (owner) {
+        console.log("🚀 [최적화] 방장 guest_id를 currentTurnGuestId로 강제 세팅:", owner.guest_id);
+        setCurrentTurnGuestId(owner.guest_id);
+        setGameStarted(true);
+      }
     }
-  }
-}, [socketParticipants, currentTurnGuestId, gameStarted]);
+  }, [socketParticipants, currentTurnGuestId, gameStarted]);
 
-useEffect(() => {
-  const timer = setTimeout(() => {
-    const isOwner = socketParticipants.find(p => p.is_creator)?.guest_id === guestStore.getState().guest_id;
-    if (isOwner && !gameStarted && gameStatus === 'waiting') {
-      console.log("⏱️ [자동 시작] 5초 경과, 게임 자동 시작 시도");
-      requestStartWordChainGame("끝말잇기");
-    }
-  }, 5000);
-  return () => clearTimeout(timer);
-}, [socketParticipants, gameStarted, gameStatus]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const isOwner = socketParticipants.find(p => p.is_creator)?.guest_id === guestStore.getState().guest_id;
+      if (isOwner && !gameStarted && gameStatus === 'waiting') {
+        console.log("⏱️ [자동 시작] 5초 경과, 게임 자동 시작 시도");
+        requestStartWordChainGame("끝말잇기");
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [socketParticipants, gameStarted, gameStatus]);
 
-useEffect(() => {
-  return () => {
-    const socket = getSocket();
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.close();
-      console.log('✅ [InGame] 언마운트 시 소켓 정상 종료');
-    }
-  };
-}, []);
+  useEffect(() => {
+    return () => {
+      const socket = getSocket();
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.close();
+        console.log('✅ [InGame] 언마운트 시 소켓 정상 종료');
+      }
+    };
+  }, []);
 
   return (
     <>
@@ -455,6 +502,7 @@ useEffect(() => {
         timeLeft={frozenTime ?? timeLeft}
         timeOver={timeOver}
         itemList={itemList}
+        earnedItems={earnedItems}
         showCount={showCount}
         players={socketParticipants}
         specialPlayer={specialPlayer}
@@ -496,6 +544,21 @@ useEffect(() => {
               </div>
             </div>
           )}
+          {/** 테스트용 턴넘기기 */}
+            {/** ---------------------------- */}
+          <button
+            onClick={() => {
+              const currentIdx = socketParticipants.findIndex(p => p.guest_id === currentTurnGuestId);
+              const nextIdx = (currentIdx + 1) % socketParticipants.length;
+              const nextTurnGuestId = socketParticipants[nextIdx].guest_id;
+              setCurrentTurnGuestId(nextTurnGuestId);
+              console.log("⏩ 강제로 턴 넘김 → 다음 guest_id:", nextTurnGuestId);
+            }}
+            className="fixed bottom-32 right-4 bg-purple-500 text-white px-4 py-2 rounded-lg shadow-md z-[999]"
+          >
+            다음 턴 넘기기 (테스트용)
+          </button>
+           {/** ---------------------------- */}
         </div>
       </div>
       {socketParticipants.length > 0 && guestStore.getState().guest_id === socketParticipants.find(p => p.is_creator)?.guest_id && (
@@ -507,13 +570,13 @@ useEffect(() => {
             게임 시작
           </button>
           <button
-  onClick={() => {
-    requestSkipTurn();  // ✅ 소켓으로 턴 넘기기 요청
-  }}
-  className="bg-yellow-400 text-black px-4 py-2 rounded-lg shadow hover:bg-yellow-500 transition"
->
-  턴 넘기기
-</button>
+            onClick={() => {
+              requestSkipTurn();  // ✅ 소켓으로 턴 넘기기 요청
+            }}
+            className="bg-yellow-400 text-black px-4 py-2 rounded-lg shadow hover:bg-yellow-500 transition"
+          >
+            턴 넘기기
+          </button>
         </div>
       )}
       {socketParticipants.length > 0 && guestStore.getState().guest_id !== socketParticipants.find(p => p.is_creator)?.guest_id && (
