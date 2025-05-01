@@ -172,7 +172,6 @@ class ConnectionManager:
         game_state["current_word"] = first_word
         game_state["last_character"] = first_word[-1]
         game_state["game_started"] = True
-        game_state["turn_number"] = 1
         game_state["used_words"] = [first_word]
         
         # 첫 플레이어 설정
@@ -257,70 +256,6 @@ class ConnectionManager:
             },
             "last_character": game_state["last_character"]
         }
-    
-    async def start_turn_timer(self, room_id: int, time_limit: int = 15):
-        """턴 타이머 시작"""
-        if room_id not in self.word_chain_games:
-            return
-            
-        # 기존 타이머 취소
-        if room_id in self.turn_timers:
-            self.turn_timers[room_id].cancel()
-            
-        # 타이머 시작
-        self.turn_timers[room_id] = asyncio.create_task(self._run_timer(room_id, time_limit))
-        
-    async def _run_timer(self, room_id: int, time_limit: int):
-        """타이머 실행 함수"""
-        try:
-            game_state = self.word_chain_games.get(room_id)
-            if not game_state:
-                return
-                
-            # 카운트다운 전송
-            for i in range(time_limit, 0, -1):
-                if room_id not in self.word_chain_games or not game_state["game_started"]:
-                    return
-                    
-                # 남은 시간 업데이트
-                await self.broadcast_room_update(
-                    room_id,
-                    "word_chain_timer",
-                    {
-                        "remaining_time": i,
-                        "current_player_id": game_state["current_player_id"],
-                        "current_player_nickname": game_state["nicknames"][game_state["current_player_id"]]
-                    }
-                )
-                
-                await asyncio.sleep(1)
-                
-            # 제한 시간 초과
-            if room_id in self.word_chain_games and game_state["game_started"]:
-                # 현재 플레이어 패배 처리
-                loser_id = game_state["current_player_id"]
-                loser_nickname = game_state["nicknames"][loser_id]
-                
-                # 게임 종료
-                game_state["is_game_over"] = True
-                
-                # 게임 종료 메시지 전송
-                await self.broadcast_room_update(
-                    room_id,
-                    "word_chain_game_over",
-                    {
-                        "reason": "time_out",
-                        "loser_id": loser_id,
-                        "loser_nickname": loser_nickname,
-                        "message": f"{loser_nickname}님이 제한 시간 내에 단어를 제출하지 못했습니다."
-                    }
-                )
-                
-        except asyncio.CancelledError:
-            # 타이머가 취소됨 (정상)
-            pass
-        except Exception as e:
-            print(f"타이머 오류: {str(e)}")
     
     async def broadcast_word_chain_state(self, room_id: int):
         """현재 끝말잇기 게임 상태 브로드캐스트"""

@@ -150,6 +150,7 @@ async def process_word_chain_message(
     gameroom_repo: GameroomRepository
 ):
     action = message_data.get("action")
+    print(f"끝말잇기 메시지 처리: action={action}")
     if action == "initialize_game":
         room = gameroom_repo.find_by_id(room_id)
         if room.created_by != guest.guest_id:
@@ -158,6 +159,16 @@ async def process_word_chain_message(
                 "message": "방장만 게임을 초기화할 수 있습니다."
             }, websocket)
             return
+        await ws_manager.broadcast_room_update(
+            room_id,
+            "word_chain_initialized",
+            {
+                "message": "끝말잇기 게임이 초기화되었습니다.",
+                "participants": participant_data
+            }
+        )
+    elif action == "start_game":
+        room = gameroom_repo.find_by_id(room_id)
         participants = gameroom_repo.find_room_participants(room_id)
         participant_data = [
             {
@@ -169,16 +180,7 @@ async def process_word_chain_message(
             for p in participants if p.left_at is None
         ]
         ws_manager.initialize_word_chain_game(room_id, participant_data)
-        await ws_manager.broadcast_room_update(
-            room_id,
-            "word_chain_initialized",
-            {
-                "message": "끝말잇기 게임이 초기화되었습니다.",
-                "participants": participant_data
-            }
-        )
-    elif action == "start_game":
-        room = gameroom_repo.find_by_id(room_id)
+        print(f"게임 시작 시도: room.created_by={room.created_by}, guest.guest_id={guest.guest_id}")
         if room.created_by != guest.guest_id:
             await ws_manager.send_personal_message({
                 "type": "error",
@@ -187,26 +189,37 @@ async def process_word_chain_message(
             return
         first_word = message_data.get("first_word", "끝말잇기")
         result = ws_manager.start_word_chain_game(room_id, first_word)
+        # 디버깅 로그 추가
+        print(f"게임 시작 결과: {result}")
         if result:
             game_state = ws_manager.get_game_state(room_id)
             if game_state:
-                await ws_manager.broadcast_room_update(
-                    room_id,
-                    "word_chain_started",
-                    {
-                        "message": "끝말잇기 게임이 시작되었습니다!",
-                        "first_word": first_word,
-                        "current_player_id": game_state["current_player_id"],
-                        "current_player_nickname": game_state["nicknames"][game_state["current_player_id"]]
-                    }
-                )
-                await ws_manager.broadcast_word_chain_state(room_id)
-                await ws_manager.start_turn_timer(room_id, game_state.get("time_limit", 15))
-        else:
-            await ws_manager.send_personal_message({
-                "type": "error",
-                "message": "게임 시작에 실패했습니다."
-            }, websocket)
+                try:
+                    # 브로드캐스트 메시지 직접 보내기
+                    await ws_manager.broadcast_to_room(
+                        room_id,
+                        {
+                            "type": "word_chain_started",
+                            "message": "끝말잇기 게임이 시작되었습니다!",
+                            "first_word": first_word,
+                            "current_player_id": game_state["current_player_id"],
+                            "current_player_nickname": game_state["nicknames"][game_state["current_player_id"]]
+                        }
+                    )
+                    # 기존 broadcast_room_update 대신 직접 broadcast_to_room 사용
+                    await ws_manager.broadcast_word_chain_state(room_id)
+                    await ws_manager.start_turn_timer(room_id, game_state.get("time_limit", 15))
+                except Exception as e:
+                    print(f"게임 시작 브로드캐스트 오류: {str(e)}")
+                    await ws_manager.send_personal_message({
+                        "type": "error",
+                        "message": f"게임 시작 메시지 전송 실패: {str(e)}"
+                    }, websocket)
+            else:
+                await ws_manager.send_personal_message({
+                    "type": "error",
+                    "message": "게임 상태가 없습니다."
+                }, websocket)
     elif action == "submit_word":
         word = message_data.get("word", "").strip()
         if not word:
@@ -327,6 +340,7 @@ async def websocket_endpoint(
     db: Session = Depends(get_db)
 ):
     guest = None
+    participant = None
     try:
         await websocket.accept()
         guest, participant = await validate_connection(websocket, room_id, guest_uuid, db)
@@ -361,30 +375,56 @@ async def websocket_endpoint(
                 data = await websocket.receive_text()
                 try:
                     message_data = json.loads(data)
-                    action = message_data.get("action", "")
                     await process_message(message_data, websocket, room_id, guest, participant, gameroom_repo)
                 except Exception as e:
+                    print(f"메시지 처리 중 오류 발생: {str(e)}")
+                    traceback.print_exc()
                     if guest:
                         await ws_manager.disconnect(websocket, room_id, guest.guest_id)
+                        # 연결이 아직 열려있다면 명시적으로 닫기
+                        if websocket.client_state.CONNECTED:
+                            await websocket.close(code=4003, reason=f"메시지 처리 오류: {str(e)}")
+                    break
         except WebSocketDisconnect:
-            await ws_manager.disconnect(websocket, room_id, guest.guest_id)
-            await ws_manager.broadcast_room_update(
-                room_id,
-                "user_left",
-                {
-                    "guest_id": guest.guest_id,
-                    "nickname": guest.nickname
-                }
-            )
+            print(f"WebSocket 연결 끊김: room_id={room_id}, guest_id={guest.guest_id if guest else 'unknown'}")
+            if guest:
+                await ws_manager.disconnect(websocket, room_id, guest.guest_id)
+                await ws_manager.broadcast_room_update(
+                    room_id,
+                    "user_left",
+                    {
+                        "guest_id": guest.guest_id,
+                        "nickname": guest.nickname
+                    }
+                )
         except Exception as e:
+            print(f"WebSocket 루프 오류: {str(e)}")
+            traceback.print_exc()
             try:
-                await websocket.close(code=4003, reason=f"오류 발생: {str(e)}")
-            except:
-                pass
+                if guest:
+                    await ws_manager.disconnect(websocket, room_id, guest.guest_id)
+                # 연결이 아직 열려있다면 명시적으로 닫기
+                if websocket.client_state.CONNECTED:
+                    await websocket.close(code=4003, reason=f"오류 발생: {str(e)}")
+            except Exception as close_error:
+                print(f"연결 종료 중 추가 오류: {str(close_error)}")
     except Exception as e:
+        print(f"WebSocket 핸들러 오류: {str(e)}")
+        traceback.print_exc()
         try:
-            await websocket.close(code=4003, reason=f"오류 발생: {str(e)}")
-        except:
+            if guest:
+                await ws_manager.disconnect(websocket, room_id, guest.guest_id)
+            # 연결이 아직 열려있다면 명시적으로 닫기
+            if websocket.client_state.CONNECTED:
+                await websocket.close(code=4003, reason=f"오류 발생: {str(e)}")
+        except Exception as close_error:
+            print(f"연결 종료 중 추가 오류: {str(close_error)}")
+    finally:
+        # 최종적으로 연결이 아직 열려있는지 확인하고 닫기
+        try:
+            if websocket.client_state.CONNECTED:
+                await websocket.close(code=1000, reason="연결 종료")
+        except Exception:
             pass
 
 @router.get("/documentation", tags=["websockets"])
@@ -412,13 +452,4 @@ def websocket_documentation():
        - 수신: `{"type": "user_joined", "data": {"guest_id": 123}}`
     4. **user_left**: 사용자 퇴장 (서버에서만 전송)
        - 수신: `{"type": "user_left", "data": {"guest_id": 123, "nickname": "사용자"}}`
-    5. **word_chain**: 끝말잇기 게임
-       - 초기화: `{"type": "word_chain", "action": "initialize_game"}`
-       - 시작: `{"type": "word_chain", "action": "start_game", "first_word": "끝말잇기"}`
-       - 단어 제출: `{"type": "word_chain", "action": "submit_word", "word": "단어"}`
-       - 종료: `{"type": "word_chain", "action": "end_game"}`
     """
-    return {
-        "message": "위 문서를 참고하세요.",
-        "websocket_url": "/ws/gamerooms/{room_id}/{guest_uuid}"
-    }
