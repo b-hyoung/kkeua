@@ -85,6 +85,7 @@ function GameLobbyPage() {
   const fetchRoomData = async () => {
     try {
       setIsLoading(true);
+      // ✅ 방 생성 호출 위치
       const response = await axiosInstance.get(ROOM_API.get_ROOMSID(roomId));
       console.log("방 정보 API 응답:", response.data);
 
@@ -137,7 +138,7 @@ function GameLobbyPage() {
     const interval = setInterval(fetchRoomData, 30000);
     return () => clearInterval(interval);
   }, [roomId]);
-  
+
   // 방장 여부 확인 useEffect - fetchRoomData에서 가져온 데이터 사용
   useEffect(() => {
     // 참가자 정보로 방장 여부 확인
@@ -171,11 +172,12 @@ function GameLobbyPage() {
 
   /* Exit from Room BTN */
   const handleClickExit = () => {
-    
+
     if (isOwner) {
       let confirmDelete = window.confirm("정말로 방을 삭제하시겠습니까?");
       if (confirmDelete) {
         try {
+          // ✅ 방 생성 호출 위치
           // 방 삭제 API 직접 호출
           axiosInstance.delete(ROOM_API.DELET_ROOMSID(roomId))
             .then(() => {
@@ -199,17 +201,18 @@ function GameLobbyPage() {
           const { uuid } = guestStore.getState();
 
           // 요청 본문에 게스트 UUID 추가
+          // ✅ 방 생성 호출 위치
           axiosInstance.post(ROOM_API.LEAVE_ROOMS(roomId), {
             guest_uuid: uuid
           })
-          .then(() => {
-            alert("방에서 나갑니다!");
-            navigate(lobbyUrl);
-          })
-          .catch((error) => {
-            console.error("방 나가기 실패:", error);
-            alert("당신은 나갈수 없어요. 끄아지옥 ON....");
-          });
+            .then(() => {
+              alert("방에서 나갑니다!");
+              navigate(lobbyUrl);
+            })
+            .catch((error) => {
+              console.error("방 나가기 실패:", error);
+              alert("당신은 나갈수 없어요. 끄아지옥 ON....");
+            });
         } catch (error) {
           console.error("방 나가기 실패:", error);
           alert("당신은 나갈수 없어요. 끄아지옥 ON....");
@@ -221,6 +224,7 @@ function GameLobbyPage() {
   /* Start BTN */
   const handleClickStartBtn = async (id) => {
     try {
+      // ✅ 방 생성 호출 위치
       await axiosInstance.post(ROOM_API.PLAY_ROOMS(roomId));
 
       if (sendMessage) {
@@ -416,32 +420,22 @@ function GameLobbyPage() {
 
   // roomUpdated 이벤트 처리 수정
   useEffect(() => {
-    // roomUpdated가 true이면 방 정보를 다시 가져옴
-    if (roomUpdated) {
+    // roomUpdated가 true이고 준비 상태가 아니면 방 정보를 다시 가져옴
+    if (roomUpdated && !isReady) {
       console.log('방 업데이트 트리거 감지, 방 정보 새로고침');
       fetchRoomData();
       // 정보를 가져온 후 상태 초기화
       setRoomUpdated(false);
     }
-  }, [roomUpdated]);
+  }, [roomUpdated, isReady]);
 
-  // 추가: 주기적으로 웹소켓 연결 상태 확인
+  // 최초 마운트 시 연결 시도 (이벤트 기반, 재연결은 훅 내부에서 처리)
   useEffect(() => {
-    const checkWebSocketConnection = () => {
-      console.log("웹소켓 연결 상태 주기적 확인:", connected ? "연결됨" : "연결 안됨");
-
-      // 연결이 끊어진 경우 재연결 시도
-      if (!connected && connect) {
-        console.log("웹소켓 연결 끊김 감지, 재연결 시도...");
-        connect();
-      }
-    };
-
-    // 10초마다 연결 상태 확인
-    const intervalId = setInterval(checkWebSocketConnection, 10000);
-
-    return () => clearInterval(intervalId);
-  }, [connected, connect]);
+    if (!connected && connect) {
+      console.log("초기 연결 시도");
+      connect();
+    }
+  }, []);
 
   if (showRedirectMessage) {
     return (
@@ -506,13 +500,12 @@ function GameLobbyPage() {
         {participants.map((player, index) => (
           <div
             key={player.guest_id || index}
-            className={`w-[200px] h-[240px] ${
-              player.is_creator
+            className={`w-[200px] h-[240px] ${player.is_creator
                 ? 'bg-white'
                 : player.status === 'READY' || player.status === 'ready'
-                ? 'bg-[#fff0e0]'
-                : 'bg-gray-100'
-            } rounded-xl shadow flex flex-col items-center justify-center gap-2 p-4 border`}
+                  ? 'bg-[#fff0e0]'
+                  : 'bg-gray-100'
+              } rounded-xl shadow flex flex-col items-center justify-center gap-2 p-4 border`}
           >
             <div className="w-[70px] h-[70px] bg-[#fde2e4] rounded-full flex items-center justify-center text-xl font-bold text-gray-700">
               {player.nickname?.charAt(0)?.toUpperCase() || 'G'}
@@ -522,13 +515,12 @@ function GameLobbyPage() {
             </div>
             {!player.is_creator && (
               <div
-                className={`text-xs px-3 py-1 rounded-full font-semibold ${
-                  player.status === 'READY' || player.status === 'ready'
+                className={`text-xs px-3 py-1 rounded-full font-semibold ${player.status === 'READY' || player.status === 'ready'
                     ? 'bg-yellow-300 text-gray-800'
                     : player.status === 'PLAYING' || player.status === 'playing'
-                    ? 'bg-blue-400 text-white'
-                    : 'bg-gray-200 text-gray-700'
-                }`}
+                      ? 'bg-blue-400 text-white'
+                      : 'bg-gray-200 text-gray-700'
+                  }`}
               >
                 {(player.status === 'READY' || player.status === 'ready') && '준비완료'}
                 {(player.status === 'PLAYING' || player.status === 'playing') && '게임중'}
@@ -576,18 +568,21 @@ function GameLobbyPage() {
             )}
           </div>
         </div>
-      ) : (
-        !isOwner && (
-          <button
-            onClick={handleReady}
-            className={`mt-8 mb-4 px-6 py-2 ${isReady
-              ? 'bg-green-500 hover:bg-green-600'
-              : 'bg-yellow-500 hover:bg-yellow-600'
-              } text-white rounded-lg shadow transition-all`}
-          >
-            {isReady ? '준비완료' : '준비하기'}
-          </button>
-        )
+      ) : null}
+      {!isOwner && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();  // 새로고침 방지
+            handleReady();       // 기존 로직 실행
+          }}
+          className={`mt-8 mb-4 px-6 py-2 ${isReady
+            ? 'bg-green-500 hover:bg-green-600'
+            : 'bg-yellow-500 hover:bg-yellow-600'
+            } text-white rounded-lg shadow transition-all`}
+        >
+          {isReady ? '준비완료' : '준비하기'}
+        </button>
       )}
 
       {/* 채팅 섹션 (고정 아님, 기존 스타일로 복원) */}
