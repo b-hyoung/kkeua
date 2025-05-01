@@ -8,3 +8,14 @@
     height: 118px;
     background-color: white;
 }
+
+@media screen and (max-width: 768px) {
+    .mobile-scroll-hide::-webkit-scrollbar {
+      display: none;
+    }
+    .mobile-scroll-hide {
+      -ms-overflow-style: none;  /* IE */
+      scrollbar-width: none;     /* Firefox */
+    }
+  }
+  

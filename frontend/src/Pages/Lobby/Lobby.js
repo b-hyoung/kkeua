@@ -213,7 +213,18 @@ function Lobby() {
 
   return (
     <div className="w-full h-screen flex justify-center bg-white">
-      <div className="hidden md:flex w-[12%] h-[70%] bg-gray-500 mr-12 self-center"></div>
+      
+      <div className="hidden md:flex items-center justify-center mr-8 ml-8">
+        <a href="https://cokathtml.vercel.app/" target="_blank" rel="noopener noreferrer">
+          <img
+            src="/imgs/gameBanner.png"
+            alt="게임 배너"
+            className="w-32 h-auto object-contain hover:scale-105 transition-transform"
+          />
+        </a>
+      </div>
+      
+      
       <div className="flex flex-col w-full max-w-4xl bg-gray-200 shadow-lg relative">
         {isEntering && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
@@ -244,8 +255,11 @@ function Lobby() {
             </div>
           </div>
         )}
-        {/* 상단 슬라이더 */}
+        
+        {/* 상단 슬라이더 
+        
         {window.innerWidth < 768 && (
+          
           <div
             className="relative w-full h-[30vh] mt-5 flex items-center justify-center transition-all duration-500"
             style={{ backgroundColor: slides[activeIndex].color }} >
@@ -263,9 +277,11 @@ function Lobby() {
             </div>
           </div>
         )}
+        */}
+        
         <div className="flex justify-end px-4 md:px-10 mt-2">
           <button
-            className="text-white bg-blue-500 hover:bg-blue-600 font-bold py-3 px-6 rounded-full shadow-lg text-base"
+            className="mb-4 text-white bg-blue-500 hover:bg-blue-600 font-bold py-3 px-6 rounded-full shadow-lg text-base"
             onClick={handleRandomEnter}
           >
             🎲 랜덤 입장
@@ -281,9 +297,9 @@ function Lobby() {
           </>
         ) : null}
         {roomsData.length > 0 && roomsData[0].title !== "" && (
-          <div className="flex-1 overflow-y-auto text-left space-y-4 px-2 md:px-10 md:pt-16 pb-24">
+          <div className="flex-1 overflow-y-auto text-left space-y-4 px-2 md:px-10 md:pt-16 pb-24 mobile-scroll-hide">
             {roomsData.map((room, index) => (
-              <div key={room.room_id || index} className="bg-white p-4 md:p-8 min-h-[12vh] md:min-h-[16vh] border-b shadow-md md:shadow-lg flex items-center justify-between">
+              <div key={room.room_id || index} className="rounded-xl bg-white p-4 md:p-8 min-h-[12vh] md:min-h-[16vh] border-b flex items-center justify-between" style={{ boxShadow: '2px 2px 3px rgba(0, 0, 0, 0.2)'}}>
                 <div>
                   <h3 className="font-bold mb-0.5 tracking-widest text-lg md:text-xl">{room?.title || '제목 없음'}</h3>
                   <p className="text-sm md:text-lg font-bold">{room?.game_mode || '알 수 없음'} [ {room?.participant_count || 0} / {room?.max_players || 0} ]</p>
@@ -353,7 +369,7 @@ function Lobby() {
 
         {/* 모바일: 방 생성하기 버튼 */}
         <div className="w-full flex justify-center py-4 bg-gray-200 border-gray-300 relative" onClick={(e) => handleClickOpenModal(e)} >
-          <button className="w-full md:w-[80%] flex items-center justify-center gap-2 text-red-400 border-2 border-[#4178ED] rounded-full px-4 py-2 shadow-lg bg-white">
+          <button className="w-full md:w-[80%] flex items-center justify-center gap-2 text-red-400 border-2 rounded-full px-4 py-2 bg-white" style={{ boxShadow: '2px 2px 3px rgba(0, 0, 0, 0.2)'}}>
             <img src={addCatImg} className="w-8 h-8" />
             방 생성하기
           </button>
@@ -366,7 +382,18 @@ function Lobby() {
           </>
         }
       </div >
-      <div className="hidden md:flex w-[12%] h-[70%] bg-gray-500 ml-12 self-center"></div>
+      
+    <div className="hidden md:flex items-center justify-center mr-8 ml-8">
+      <a href="https://blog.naver.com/catoo_4" target="_blank" rel="noopener noreferrer">
+        <img
+          src="/imgs/blogBanner.png"
+          alt="블로그 배너"
+          className="w-32 h-auto object-contain hover:scale-105 transition-transform"
+        />
+      </a>
+    </div>
+
+        
     </div >
   );
 }
