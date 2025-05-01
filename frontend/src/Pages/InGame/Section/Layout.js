@@ -36,7 +36,8 @@ function Layout({
   typingText,
   handleTypingDone,
   message,
-  itemList,
+  itemList, // submitted word history
+  earnedItems, // earned items
   setItemList, // <-- 추가
   showCount,
   players,
@@ -208,8 +209,18 @@ function Layout({
                       {[0, 1, 2, 3].map((slot) => (
                         <div
                           key={slot}
-                          className="w-6 h-6 rounded-[6px] border-2 border-orange-300 shadow-md"
-                        ></div>
+                          className="w-6 h-6 rounded-[6px] border-2 border-orange-300 shadow-md flex items-center justify-center"
+                        >
+                          {/* Render earned items as icons in slots */}
+                          {earnedItems && earnedItems[slot] && (
+                            <span title={earnedItems[slot].name} style={{ fontSize: '1.1em' }}>
+                              {earnedItems[slot].name.includes('불꽃') && '🔥'}
+                              {earnedItems[slot].name.includes('얼음') && '❄️'}
+                              {earnedItems[slot].name.includes('번개') && '⚡'}
+                              {!['불꽃', '얼음', '번개'].some(keyword => earnedItems[slot].name.includes(keyword)) && '🎖️'}
+                            </span>
+                          )}
+                        </div>
                       ))}
                     </div>
                   </div>
