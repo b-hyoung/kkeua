@@ -20,6 +20,18 @@ import { sendWordToServer } from './Socket/kdataSocket';
 const time_gauge = 40;
 
 function InGame() {
+  // Helper to get owner info from participants
+  const getOwnerInfo = (participants) =>
+    participants.find(p =>
+      p.is_owner === true || p.is_owner === "true" ||
+      p.is_creator === true || p.is_creator === "true"
+    );
+  // Helper to update current turn
+  const updateCurrentTurn = (id) => {
+    if (id !== undefined && id !== null) {
+      setCurrentTurnGuestId(id);
+    }
+  };
   const hasConnectedRef = useRef(false);
   const [itemList, setItemList] = useState([]); // submitted word history
   const [earnedItems, setEarnedItems] = useState([
@@ -113,12 +125,12 @@ function InGame() {
             socketParticipantsRef.current(res.data);
             console.log('🌟 참가자 정보 setSocketParticipants 호출됨 via API');
             // 👑 방장 정보 추출 및 currentTurnGuestId 업데이트
-            const ownerInfo = res.data.find(p => p.is_creator === true || p.is_creator === "true");
+            const ownerInfo = getOwnerInfo(res.data);
             if (ownerInfo) {
               console.log('👑 방장 정보:', ownerInfo);
               setCurrentTurnGuestId(ownerInfo.guest_id);
             } else {
-              console.warn('⚠️ 방장 정보 없음 (is_creator가 true인 참가자 없음)', res.data);
+              console.warn('⚠️ 방장 정보 없음 (is_owner/is_creator가 true인 참가자 없음)', res.data);
             }
           } else {
             console.error('❌ 참가자 API 응답이 예상과 다름:', res.data);
@@ -132,7 +144,6 @@ function InGame() {
           switch (data.type) {
             case "user_joined":
               console.log("👤 user_joined 수신:", data.data);
-              console.log('📬 [유저 참가] 메시지 수신:', data);
               break;
             case "participants_update":
               console.log('✅ participants_update 수신:', data);
@@ -143,7 +154,7 @@ function InGame() {
                 setSocketParticipants(data.participants);
                 socketParticipantsRef.current(data.participants);
                 // 👑 [참가자 갱신] 방장 정보 추출 및 currentTurnGuestId 업데이트
-                const updatedOwnerInfo = data.participants.find(p => p.is_creator === true || p.is_creator === "true");
+                const updatedOwnerInfo = getOwnerInfo(data.participants);
                 if (updatedOwnerInfo) {
                   console.log('👑 [참가자 갱신] 방장 정보:', updatedOwnerInfo);
                   setCurrentTurnGuestId(updatedOwnerInfo.guest_id);
@@ -163,20 +174,19 @@ function InGame() {
               break;
             case "connected":
               console.log("✅ connected 수신:", data);
-              console.log('📬 [소켓 연결] 메시지 수신:', data);
               break;
             case "word_chain_started":
-              console.log('✅ word_chain_started 수신');
+              console.log('✅ word_chain_started 수신:', data);
               if (data.first_word) {
                 setQuizMsg(data.first_word);
               }
+              updateCurrentTurn(data.current_player_id);
+              console.log("🎯 게임 시작 - 현재 턴 플레이어 ID 설정 (from word_chain_started):", data.current_player_id);
               setGameStatus('playing');
               requestCurrentTurn();
               break;
             case "word_chain_state":
-              if (data.current_player_id !== undefined) {
-                setCurrentTurnGuestId(data.current_player_id);
-              }
+              updateCurrentTurn(data.current_player_id);
               break;
             case "word_validation_result":
               if (data.valid) {
@@ -210,7 +220,6 @@ function InGame() {
         const waitForSocketConnection = (callback) => {
           const socket = getSocket();
           if (!socket) return console.error("❌ 소켓 없음");
-
           if (socket.readyState === WebSocket.OPEN) {
             callback();
           } else {
@@ -218,10 +227,6 @@ function InGame() {
             setTimeout(() => waitForSocketConnection(callback), 100); // 0.1초 간격 재시도
           }
         };
-
-        waitForSocketConnection(() => {
-          requestCurrentTurn();
-        });
         // 소켓 연결 후 3초 대기 (딜레이를 3초 주는 코드)
         await new Promise(resolve => setTimeout(resolve, 3000));
 
@@ -465,27 +470,33 @@ useEffect(() => {
 
 
 
-  useEffect(() => {
-    if (!gameStarted && socketParticipants.length > 0 && currentTurnGuestId === null) {
-      const owner = socketParticipants.find(p => p.is_creator === true || p.is_creator === "true");
-      if (owner) {
-        console.log("🚀 [최적화] 방장 guest_id를 currentTurnGuestId로 강제 세팅:", owner.guest_id);
-        setCurrentTurnGuestId(owner.guest_id);
-        setGameStarted(true);
-      }
+// 🚫 비활성화: 백엔드에서 word_chain_started 받아야 하므로 강제 세팅 제거
+/*
+useEffect(() => {
+  if (!gameStarted && socketParticipants.length > 0 && currentTurnGuestId === null) {
+    const owner = socketParticipants.find(p =>
+      p.is_owner === true || p.is_owner === "true" ||
+      p.is_creator === true || p.is_creator === "true"
+    );
+    if (owner) {
+      console.log("🚀 [최적화] 방장 guest_id를 currentTurnGuestId로 강제 세팅:", owner.guest_id);
+      setCurrentTurnGuestId(owner.guest_id);
+      setGameStarted(true);
     }
-  }, [socketParticipants, currentTurnGuestId, gameStarted]);
+  }
+}, [socketParticipants, currentTurnGuestId, gameStarted]);
+*/
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const isOwner = socketParticipants.find(p => p.is_creator)?.guest_id === guestStore.getState().guest_id;
-      if (isOwner && !gameStarted && gameStatus === 'waiting') {
-        console.log("⏱️ [자동 시작] 5초 경과, 게임 자동 시작 시도");
-        requestStartWordChainGame("끝말잇기");
-      }
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [socketParticipants, gameStarted, gameStatus]);
+useEffect(() => {
+  const timer = setTimeout(() => {
+    const isOwner = socketParticipants.find(p => p.is_owner || p.is_creator)?.guest_id === guestStore.getState().guest_id;
+    if (isOwner && gameStatus === 'waiting') {
+      console.log("⏱️ [자동 시작] 5초 경과, 방장이므로 게임 시작 요청 보냄");
+      requestStartWordChainGame("끝말잇기");
+    }
+  }, 5000);
+  return () => clearTimeout(timer);
+}, [socketParticipants, gameStatus]);
 
   useEffect(() => {
     return () => {
@@ -531,6 +542,7 @@ useEffect(() => {
         gameid={gameid}
         currentTurnGuestId={currentTurnGuestId}
         myGuestId={guestStore.getState().guest_id}
+        gameEnded={gameEnded}
       />
       <div className="w-full max-w-md mx-auto mt-4 p-2 bg-gray-100 rounded-lg shadow">
         <h2 className="text-center font-bold mb-2">📤 전송한 메시지</h2>
@@ -566,7 +578,7 @@ useEffect(() => {
            {/** ---------------------------- */}
         </div>
       </div>
-      {socketParticipants.length > 0 && guestStore.getState().guest_id === socketParticipants.find(p => p.is_creator)?.guest_id && (
+      {socketParticipants.length > 0 && guestStore.getState().guest_id === socketParticipants.find(p => p.is_owner || p.is_creator)?.guest_id && (
         <div className="fixed top-10 left-4 z-50 flex space-x-2">
           <button
             onClick={() => requestStartWordChainGame("끝말잇기")}
@@ -584,7 +596,7 @@ useEffect(() => {
           </button>
         </div>
       )}
-      {socketParticipants.length > 0 && guestStore.getState().guest_id !== socketParticipants.find(p => p.is_creator)?.guest_id && (
+      {socketParticipants.length > 0 && guestStore.getState().guest_id !== socketParticipants.find(p => p.is_owner || p.is_creator)?.guest_id && (
         <div className="fixed bottom-4 left-4 z-50">
           <button
             onClick={handleMoveToLobby}

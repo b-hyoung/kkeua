@@ -61,7 +61,10 @@ export function connectSocket(gameId) {
         "word_chain_game_ended",
         "word_chain_error",
         "word_validation_result",
-        "time_sync"
+        "time_sync",
+        "user_joined",
+        "participants_update",
+        "connected"
       ];
 
       if (wordChainRelevantTypes.includes(data.type)) {
@@ -70,10 +73,13 @@ export function connectSocket(gameId) {
             currentPlayerId = data.current_player_id;
             console.log("🎯 현재 턴 플레이어 ID 업데이트:", currentPlayerId);
         }
-        // === 추가: word_chain_started 수신 시 currentPlayerId 설정 ===
-        if (data.type === "word_chain_started" && data.current_player_id !== undefined && data.current_player_id !== null) {
-          currentPlayerId = data.current_player_id;
-          console.log("🎯 게임 시작 - 현재 턴 플레이어 ID 설정:", currentPlayerId);
+        // === word_chain_started 수신 시 상세 로그 및 currentPlayerId 설정 ===
+        if (data.type === "word_chain_started") {
+          console.log("✅ word_chain_started 메시지 수신 (from socket):", data);
+          if (data.current_player_id !== undefined && data.current_player_id !== null) {
+            currentPlayerId = data.current_player_id;
+            console.log("🎯 게임 시작 - 현재 턴 플레이어 ID 설정:", currentPlayerId);
+          }
         }
         // === 추가: word_chain_word_submitted 수신 시 currentPlayerId를 next_turn_guest_id로 변경 ===
         if (data.type === "word_chain_word_submitted" && data.next_turn_guest_id !== undefined && data.next_turn_guest_id !== null) {

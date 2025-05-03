@@ -51,7 +51,10 @@ export default function useTopMsg({
     setInputValue('');
 
     // 업데이트: 제시어를 입력 단어의 마지막 문자로 설정
-    setQuizMsg(trim.charAt(trim.length - 1));
+    const nextQuizChar = trim.charAt(trim.length - 1);
+    if (quizMsg !== nextQuizChar) {
+      setQuizMsg(nextQuizChar);
+    }
   };
 
   return { crashMessage };

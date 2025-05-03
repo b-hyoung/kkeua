@@ -23,8 +23,8 @@ function ProgressBar({ inputTimeLeft }) {
         alt="고양이22"
         className="absolute top-1/2 w-6 h-6 z-10"
         style={{
-          left: `${inputTimeLeft === 120 ? '100%' : (inputTimeLeft / 120) * 100 + '%'}`,
-          transform: 'translate(-50%, -50%)',
+          left: `${100 - (inputTimeLeft / 120) * 100}%`,
+          transform: 'translate(0%, -50%)',
         }}
       />
     </div>
@@ -61,7 +61,8 @@ function Layout({
   handleClickFinish, // <-- Add this line
   gameid, //gameid
   currentTurnGuestId, // Added currentTurnGuestId prop
-  myGuestId // Added myGuestId prop
+  myGuestId, // Added myGuestId prop
+  gameEnded // <-- add this line
 }) {
 
   useEffect(() => {
@@ -263,7 +264,11 @@ function Layout({
                 }`}
               placeholder="즐거운 끄아와"
               value={inputValue}
-              disabled={currentTurnGuestId !== null && Number(myGuestId) !== Number(currentTurnGuestId)}
+              disabled={
+                gameEnded ||
+                message === '게임종료!' ||
+                (currentTurnGuestId !== null && Number(myGuestId) !== Number(currentTurnGuestId))
+              }
               onChange={(e) => {
                 if (!typingText) {
                   setInputValue(e.target.value);
