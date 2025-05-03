@@ -537,52 +537,54 @@ function GameLobbyPage() {
       </div>
 
       {/* 준비 버튼 또는 게임 시작 버튼 (채팅창 바로 위로 이동) */}
-      {isOwner ? (
-        <div className="w-full text-center mt-8 mb-4">
-          <div className="relative inline-block group">
-            <button
-              onClick={() => {
-                const allNonOwnerPlayersReady = socketParticipants.every(player =>
-                  player.is_creator || player.status === 'READY' || player.status === 'ready'
-                );
+      {participants.length > 0 && (
+        participants.find(p => p.is_creator)?.guest_id === guestStore.getState().guest_id
+          ? (
+            <div className="w-full text-center mt-8 mb-4">
+              <div className="relative inline-block group">
+                <button
+                  onClick={() => {
+                    const allNonOwnerPlayersReady = participants.every(player =>
+                      player.is_creator || player.status === 'READY' || player.status === 'ready'
+                    );
 
-                if (participants.length >= 2 && allNonOwnerPlayersReady) {
-                  handleClickStartBtn();
-                } else if (participants.length < 2) {
-                  alert('게임 시작을 위해 최소 2명의 플레이어가 필요합니다.');
-                } else {
-                  alert('모든 플레이어가 준비 상태여야 합니다.');
-                }
-              }}
-              className={`px-6 py-2 rounded-lg shadow transition-all font-bold ${participants.length >= 2
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-gray-400 text-white cursor-not-allowed'
-                }`}
-            >
-              게임 시작
-            </button>
-            {participants.length < 2 && (
-              <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 shadow-md">
-                2인 이상일 때 게임을 시작할 수 있습니다
+                    if (participants.length >= 2 && allNonOwnerPlayersReady) {
+                      handleClickStartBtn();
+                    } else if (participants.length < 2) {
+                      alert('게임 시작을 위해 최소 2명의 플레이어가 필요합니다.');
+                    } else {
+                      alert('모든 플레이어가 준비 상태여야 합니다.');
+                    }
+                  }}
+                  className={`px-6 py-2 rounded-lg shadow transition-all font-bold ${participants.length >= 2
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-gray-400 text-white cursor-not-allowed'
+                    }`}
+                >
+                  게임 시작
+                </button>
+                {participants.length < 2 && (
+                  <div className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-black text-white text-sm px-4 py-2 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10 shadow-md">
+                    2인 이상일 때 게임을 시작할 수 있습니다
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-      ) : null}
-      {!isOwner && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();  // 새로고침 방지
-            handleReady();       // 기존 로직 실행
-          }}
-          className={`mt-8 mb-4 px-6 py-2 ${isReady
-            ? 'bg-green-500 hover:bg-green-600'
-            : 'bg-yellow-500 hover:bg-yellow-600'
-            } text-white rounded-lg shadow transition-all`}
-        >
-          {isReady ? '준비완료' : '준비하기'}
-        </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                handleReady();
+              }}
+              className={`mt-8 mb-4 px-6 py-2 ${isReady
+                ? 'bg-green-500 hover:bg-green-600'
+                : 'bg-yellow-500 hover:bg-yellow-600'
+                } text-white rounded-lg shadow transition-all`}
+            >
+              {isReady ? '준비완료' : '준비하기'}
+            </button>
+          )
       )}
 
       {/* 채팅 섹션 (고정 아님, 기존 스타일로 복원) */}

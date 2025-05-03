@@ -78,8 +78,8 @@ function InGame() {
           guestUuid = loginRes.data.uuid;
           document.cookie = `kkua_guest_uuid=${guestUuid}; path=/`;
 
-          // 약간 대기 시간 주기
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // 약간 대기 시간 주기 (300ms로 증가)
+          await new Promise(resolve => setTimeout(resolve, 300)); // Increased wait to ensure cookie is set
 
           attempts++;
         }
@@ -94,7 +94,12 @@ function InGame() {
           throw new Error("🚫 쿠키 세팅 실패: guestUuid 없음");
         }
 
-        if (!hasConnectedRef.current) {
+        // ⛔ 최종 guestUuid 유효성 확인
+        if (!guestUuid || guestUuid.length < 5) {
+          throw new Error("🚫 guestUuid 최종 확인 실패: 쿠키에 값 없음");
+        }
+
+        if (!hasConnectedRef.current && guestUuid) {
           connectSocket(gameid);
           hasConnectedRef.current = true;
         }

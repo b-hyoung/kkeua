@@ -81,13 +81,22 @@ export default function useGameRoomSocket(roomId) {
                     console.log('📦 participants_update 전체 데이터:', JSON.stringify(data, null, 2));
                     if (data.participants && Array.isArray(data.participants)) {
                         setParticipants(prev =>
-                          data.participants.map(newP => {
-                            const existing = prev.find(p => p.guest_id === newP.guest_id);
-                            return {
-                              ...newP,
-                              is_creator: newP.is_creator ?? existing?.is_creator ?? false
-                            };
-                          })
+                            data.participants.map(newP => {
+                                const existing = prev.find(p => p.guest_id === newP.guest_id);
+
+                                const isCreatorValue =
+                                    typeof newP.is_creator === 'boolean'
+                                        ? newP.is_creator
+                                        : typeof newP.is_owner === 'boolean'
+                                            ? newP.is_owner
+                                            : existing?.is_creator || false;
+
+                                return {
+                                    ...existing,
+                                    ...newP,
+                                    is_creator: isCreatorValue
+                                };
+                            })
                         );
 
                         if (data.message) {
