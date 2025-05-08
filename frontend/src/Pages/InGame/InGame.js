@@ -286,26 +286,42 @@ useEffect(() => {
     checkGuest();
   }, []);
 
-  const [timeOver, setTimeOver] = useState(false);
+
+       // ---------------------------------------------------------------
+       // ---------------------------------------------------------------
+  
+       
+  //타임오버 boolean값
+  const [timeOver, setTimeOver] = (false);
+  //InputTimeLeft 시간 초과로 게임 종료 시 남은 전체 게임시간 고정 (필요하지않음 x) 
   const [frozenTime, setFrozenTime] = useState(null);
+  //유저 채팅 입력시간
   const [inputTimeLeft, setInputTimeLeft] = useState(12);
 
+  //전체 타이머 (고정 120초)
   const [timeLeft, setTimeLeft] = useState(120);
+  // 고정타이머 초기화 함수
   const resetTimer = () => setTimeLeft(120);
 
-  const [catActive, setCatActive] = useState(true);
-
+  /* 전체 타임아웃 조건문
+    게임종료되지않았을때 전체게임시간(120)에서 1초씩 줄어들기
+  */
   useEffect(() => {
     if (gameEnded || timeLeft <= 0) return;
     const interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
     return () => clearInterval(interval);
   }, [timeLeft, gameEnded]);
 
+  //개인 유저별 입력히스토리
   const [usedLog, setUsedLog] = useState([]);
-  const [specialPlayer, setSpecialPlayer] = useState('부러');
+  //현재 입력중인 유저를 담은값
+  const [specialPlayer, setSpecialPlayer] = useState();
 
+  //유저 입력창
   const [inputValue, setInputValue] = useState('');
+  //상단 메세지(유저 입력 시 상단 박스에 뜨기)
   const [message, setMessage] = useState('');
+  //전체 유저 입력값 히스토리 
   const [showCount, setShowCount] = useState(5);
 
   // 애니메이션 상태
@@ -357,7 +373,6 @@ useEffect(() => {
     setTypingText('');
     setPendingItem(null);
     setInputTimeLeft(12);
-    setCatActive(true);
   };
 
   useEffect(() => {
@@ -381,7 +396,6 @@ useEffect(() => {
         setMessage('게임종료!');
         setFrozenTime(timeLeft);
         setRandomQuizWord();
-        setCatActive(false);
         resetTimer();
       }, 500);
     }
@@ -469,24 +483,6 @@ useEffect(() => {
   };
 
 
-
-// 🚫 비활성화: 백엔드에서 word_chain_started 받아야 하므로 강제 세팅 제거
-/*
-useEffect(() => {
-  if (!gameStarted && socketParticipants.length > 0 && currentTurnGuestId === null) {
-    const owner = socketParticipants.find(p =>
-      p.is_owner === true || p.is_owner === "true" ||
-      p.is_creator === true || p.is_creator === "true"
-    );
-    if (owner) {
-      console.log("🚀 [최적화] 방장 guest_id를 currentTurnGuestId로 강제 세팅:", owner.guest_id);
-      setCurrentTurnGuestId(owner.guest_id);
-      setGameStarted(true);
-    }
-  }
-}, [socketParticipants, currentTurnGuestId, gameStarted]);
-*/
-
 useEffect(() => {
   const timer = setTimeout(() => {
     const isOwner = socketParticipants.find(p => p.is_owner || p.is_creator)?.guest_id === guestStore.getState().guest_id;
@@ -516,13 +512,11 @@ useEffect(() => {
         quizMsg={quizMsg}
         message={timeOver ? '시간 초과!' : message}
         timeLeft={frozenTime ?? timeLeft}
-        timeOver={timeOver}
         itemList={itemList}
         earnedItems={earnedItems}
         showCount={showCount}
         players={socketParticipants}
         specialPlayer={specialPlayer}
-        setSpecialPlayer={setSpecialPlayer}
         inputValue={inputValue}
         setInputValue={setInputValue}
         crashKeyDown={crashKeyDown}
@@ -535,7 +529,6 @@ useEffect(() => {
         usedLog={usedLog}
         reactionTimes={reactionTimes}
         handleClickFinish={handleClickFinish}
-        catActive={catActive}
         frozenTime={frozenTime}
         isPlaying={gameStatus === 'playing'}
         isGameEnded={gameEnded}

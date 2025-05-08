@@ -42,7 +42,6 @@ function Layout({
   showCount,
   players,
   specialPlayer,
-  setSpecialPlayer,
   inputValue,
   setInputValue,
   crashKeyDown,
@@ -52,7 +51,6 @@ function Layout({
   setInputTimeLeft,
   setRandomQuizWord,
   setPendingItem, // Added setter here
-  catActive, // Added catActive prop
   frozenTime, // add this line
   socketParticipants, // Added socketParticipants prop
   finalResults, // Added finalResults prop
