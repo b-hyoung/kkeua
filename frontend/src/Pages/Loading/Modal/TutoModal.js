@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { lobbyUrl } from '../../../Component/urls';
+import { lobbyUrl } from '../../../utils/urls';
 
 function TutoModal({ showModal, setShowModal, guideSections }) {
 

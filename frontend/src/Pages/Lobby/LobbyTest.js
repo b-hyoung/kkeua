@@ -1,15 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Lobby.css';
-import { gameLobbyUrl, /* gameUrl, */ lobbyUrl } from '../../Component/urls';
+import { gameLobbyUrl, /* gameUrl, */ lobbyUrl } from '../../utils/urls';
 import AddRoomModal from './Section/AddRoomModal';
 import axiosInstance from '../../Api/axiosInstance';
 import { ROOM_API } from '../../Api/roomApi';
 import guestStore from '../../store/guestStore'
-import userIsTrue from '../../Component/userIsTrue';
+import userIsTrue from '../../utils/userIsTrue';
 import { USER_API } from '../../Api/userApi';
 import Cookies from 'js-cookie';
-import { addCatImg, refreshImg } from '../../Component/imgUrl';
+import { addCatImg, refreshImg } from '../../utils/imgUrl';
 
 function LobbyTest() {
   const navigate = useNavigate();

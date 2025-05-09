@@ -3,18 +3,18 @@ import { useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axiosInstance from '../../Api/axiosInstance';
 import { ROOM_API } from '../../Api/roomApi';
-import { gameLobbyUrl } from '../../Component/urls';
+import { gameLobbyUrl } from '../../utils/urls';
 import Layout from './Section/Layout';
 import Timer from './Section/Timer';
 import useTopMsg from './Section/TopMsg';
 import TopMsgAni from './Section/TopMsg_Ani';
 import EndPointModal from './Section/EndPointModal';
-import userIsTrue from '../../Component/userIsTrue';
+import userIsTrue from '../../utils/userIsTrue';
 import guestStore from '../../store/guestStore';
-import { getCurrentTurnGuestId, requestCurrentTurn } from './Socket/mainSocket';
+import { requestCurrentTurn } from './Socket/mainSocket';
+import { addIfNotExists } from '../../utils/arrayHelper.js';
 
 import { connectSocket, getSocket, setReceiveWordHandler, submitWordChainWord, requestStartWordChainGame, requestEndWordChainGame, requestSkipTurn } from './Socket/mainSocket';
-import { sendWordToServer } from './Socket/kdataSocket';
 // import { submitWordChainWord, requestStartWordChainGame } from './Socket/mainSocket'; // ✅ 끝말잇기 소켓 헬퍼 불러오기
 
 // 1. 고양이 제한시간 시간 게이지 최대값 (상수) 
@@ -347,46 +347,36 @@ useEffect(() => {
        // ---------------------------------------------------------------
        // ---------------------------------------------------------------
   
-       
-  //타임오버 boolean값
-  const [timeOver, setTimeOver] = (false);
-  //InputTimeLeft 시간 초과로 게임 종료 시 남은 전체 게임시간 고정 (필요하지않음 x) 
+// =======================================
+// [A] 타이머   [B] 유저 입력 
+// =======================================
+
+//            === [A] 타이머  ===
+  // A1. 게임종료시 남은 전체시간
   const [frozenTime, setFrozenTime] = useState(null);
-  //유저 채팅 입력시간
+  // A2. 유저 입력 타이머
   const [inputTimeLeft, setInputTimeLeft] = useState(12);
-
-  //전체 타이머 (고정 120초)
+  // A3. 전체 게임 종료시간
   const [timeLeft, setTimeLeft] = useState(120);
-  // 고정타이머 초기화 함수
-  const resetTimer = () => setTimeLeft(120);
-
-  /* 전체 타임아웃 조건문
-    게임종료되지않았을때 전체게임시간(120)에서 1초씩 줄어들기
-  */
-  useEffect(() => {
-    if (gameEnded || timeLeft <= 0) return;
-    const interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
-    return () => clearInterval(interval);
-  }, [timeLeft, gameEnded]);
-
-  //개인 유저별 입력히스토리
+  
+//            === [B] 유저 입력 ===
+  // B1. 유저 개인입력히스토리(점수판 계산용)
   const [usedLog, setUsedLog] = useState([]);
-  //현재 입력중인 유저를 담은값
+  // B2. 현재 입력해야할 유저 정보
   const [specialPlayer, setSpecialPlayer] = useState();
-
-  //유저 입력창
+  // B3. 유저 입력 인풋관리
   const [inputValue, setInputValue] = useState('');
-  //상단 메세지(유저 입력 시 상단 박스에 뜨기)
+  // B4. 상단 메뉴바 메세지 관리
   const [message, setMessage] = useState('');
-  //전체 유저 입력값 히스토리 
+  // B5. 전체유저 입력히스토리
   const [showCount, setShowCount] = useState(5);
-
-  // 애니메이션 상태
+  // B6. 유저 입력 시 텍스트 애니메이션화로 띄워주기위한 변수
   const [typingText, setTypingText] = useState('');
+  // B7. 유저 현재입력값 저장해서 마지막 단어 추출용
   const [pendingItem, setPendingItem] = useState(null);
-
+  // B8. 점수판기재용 유저 입력시간 저장
   const [reactionTimes, setReactionTimes] = useState([]);
-
+  // B9. 입력된 단어에 대한 유효성 검사 및 상태 업데이트 로직 제공 (끝말잇기 규칙 포함)
   const { crashMessage } = useTopMsg({
     inputValue,
     itemList,
@@ -401,86 +391,67 @@ useEffect(() => {
     setQuizMsg
   });
 
-  const [usedWords, setUsedWords] = useState([]);
-  const [currentPlayer, setCurrentPlayer] = useState(null);
-  const [lastCharacter, setLastCharacter] = useState('');
+  // F1. 타이머 리셋함수
+  const resetTimer = () => setTimeLeft(120);
 
-
+ // F2. 정답 처리 후 상태 업데이트: 사용 단어 목록 갱신, 다음 제시어 설정, 다음 유저로 스페셜유저 변경
+  //      + 서버에 현재 유저의 단어 전송, 타이머/입력값 초기화
   const handleTypingDone = () => {
     if (!pendingItem) return;
 
-    setUsedLog(prev => (!prev.includes(pendingItem.word) ? [...prev, pendingItem.word] : prev));
-    setItemList(prev => (!prev.find(item => item.word === pendingItem.word) ? [...prev, pendingItem] : prev));
+    // 유효단어 현재로그에 있는지 확인 후 추가
+    setUsedLog(prev => addIfNotExists(prev, pendingItem, 'word'));
+    // 
+    setItemList(prev => addIfNotExists(prev, pendingItem, 'word'));
+    // 탑메세지에 마지막 글자 전달
     setQuizMsg(pendingItem.word.charAt(pendingItem.word.length - 1));
 
+    // 스페셜유저 다음턴으로 넘기기
     setSpecialPlayer(prev => {
       const currentIndex = socketParticipants.map(p => p.nickname).indexOf(prev);
       return socketParticipants.map(p => p.nickname)[(currentIndex + 1) % socketParticipants.length];
     });
+    // 현재유저 , 마지막 단어 , 아이템사용 여부 전달
+    submitWordChainWord(
+      pendingItem.word,
+      guestStore.getState().guest_id,
+      currentTurnGuestId
+    );
 
-    sendWordToServer({
-      user: specialPlayer,
-      word: pendingItem.word,
-      itemUsed: false,
-    });
-
-    // Example: handle earned item logic here if needed
-    // setEarnedItems(...) if earned items are awarded on typing done
-
+    //유후 타이핑 텍스트 초기화
     setTypingText('');
+    //마지막입력값 지우기
     setPendingItem(null);
+    //타이머시간 다시 12초로 리셋
     setInputTimeLeft(12);
   };
-
-  useEffect(() => {
-    // 모바일은 3개, PC는 4개 보여주게 함
-    const updateCount = () => {
-      setShowCount(window.innerWidth >= 400 ? 4 : 3);
-    };
-    updateCount();
-    window.addEventListener('resize', updateCount);
-    return () => window.removeEventListener('resize', updateCount);
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => setInputTimeLeft(prev => (prev > 0 ? prev - 1 : 0)), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    if (inputTimeLeft === 0 && inputValue.trim() === '' && typingText === '') {
-      setTimeout(() => {
-        setMessage('게임종료!');
-        setFrozenTime(timeLeft);
-        setRandomQuizWord();
-        resetTimer();
-      }, 500);
-    }
-  }, [inputTimeLeft, inputValue, typingText, timeLeft, resetTimer]);
-
+  
+  //F3. 유저 입력 후 소켓전송
   const handleSubmitWord = () => {
+    //게임 미시작시 알림
     if (!gameStarted) {
       alert('⛔ 게임이 아직 시작되지 않았습니다.');
       return;
     }
+    //현재 유저의 id와 입력해야할 차례의 유저 id입력
     console.log("🚥 내 guest_id:", guestStore.getState().guest_id);
     console.log("🚥 현재 currentTurnGuestId:", currentTurnGuestId);
-
+    //참가자 인원확인
     if (socketParticipants.length === 0) {
       alert('⛔ 참가자 정보가 아직 없습니다.');
       return;
     }
-
+    //현재 턴 유저 확인
     if (currentTurnGuestId === null) {
       alert('⛔ 아직 게임 시작 전이거나 턴 정보가 없습니다.');
       return;
     }
-
+    // 차례가 아닌 유저가 입력 시 예외처리
     if (guestStore.getState().guest_id !== currentTurnGuestId) {
       alert('⛔ 현재 당신 차례가 아닙니다.');
       return;
     }
-
+    //유저 입력시 빈값이 아닐 경우
     if (inputValue.trim() !== '') {
       submitWordChainWord(inputValue.trim(), guestStore.getState().guest_id, currentTurnGuestId);
 
@@ -508,19 +479,26 @@ useEffect(() => {
       setInputValue('');
     }
   };
-
+  //F4. 엔터 입력 시  F3번 실행( 소켓에 유저입력값 전송 )
   const crashKeyDown = (e) => {
     if (e.key === 'Enter') {
       handleSubmitWord();
     }
   };
 
+  // F5 결과 종료
+  /** 현재는 클릭으로 인한 종료이지만
+   * 추후 3라운드 진행 후 마지막라운드 종료 시 실행
+   */
   const handleClickFinish = async () => {
     try {
+      //게임종료 API 서버에 전달
       await axiosInstance.post(ROOM_API.END_ROOMS(gameid));
+      //성공 시 소켓에 전송
       requestEndWordChainGame();
-      setShowEndPointModal(false);
+      //모달 1초뒤 생성
       setTimeout(() => setShowEndPointModal(true), 100); // 결과 모달 강제 띄우기
+      // 이후 5초뒤 로비로 이동하기
       setTimeout(() => {
         handleMoveToLobby();
       }, 5000);
@@ -530,27 +508,74 @@ useEffect(() => {
     }
   };
 
+  // F6 소켓 종료 후 로비이동
   const handleMoveToLobby = () => {
-    const sock = getSocket();
-    if (sock && sock.readyState === WebSocket.OPEN) {
-      sock.close();
-      console.log('✅ 로비 이동 전에 소켓 정상 종료');
-    }
     navigate(gameLobbyUrl(gameid));
   };
 
 
-useEffect(() => {
-  const timer = setTimeout(() => {
-    const isOwner = socketParticipants.find(p => p.is_owner || p.is_creator)?.guest_id === guestStore.getState().guest_id;
-    if (isOwner && gameStatus === 'waiting') {
-      console.log("⏱️ [자동 시작] 5초 경과, 방장이므로 게임 시작 요청 보냄");
-      requestStartWordChainGame("끝말잇기");
-    }
-  }, 5000);
-  return () => clearTimeout(timer);
-}, [socketParticipants, gameStatus]);
+  // E1. 최대시간에서 1초씩 감소
+  useEffect(() => {
+    // 게임이 종료되었거나 시간이 모두 소진되었으면 타이머 중단
+    if (gameEnded || timeLeft <= 0) return;
+    // 1초마다 timeLeft를 1씩 감소
+    const interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+    // 클린업: 타이머 제거
+    // setInterval을 사용할떈 항상 clearInterval를 사용해야 메모리 누수를 막을수있다. 
+    return () => clearInterval(interval);
+    // 유저입력시간 또는 게임 종료여부에 따른 함수 재실행 여부
+  }, [timeLeft, gameEnded]);
 
+  // E2. 화면에 따른 히스토리 개수 보여주기
+  useEffect(() => {
+    // 모바일은 3개, PC는 4개 보여주게 함
+    const updateCount = () => {
+      setShowCount(window.innerWidth >= 400 ? 4 : 3);
+    };
+    // 처음 렌더링될 때 한 번 실행
+    updateCount();
+    // 브라우저 크기 바뀔 때마다 다시 실행
+    window.addEventListener('resize', updateCount);
+    return () => window.removeEventListener('resize', updateCount); // 클린업
+  }, []);
+
+  // E3. 유저입력 타이머
+  useEffect(() => {
+    //초당 1초씩 줄어들기 
+    const timer = setInterval(() => setInputTimeLeft(prev => (prev > 0 ? prev - 1 : 0)), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  
+
+  // E4. 입력 타이머가 0초일 때 아무 입력 없이 지나가면 게임 종료 처리
+  useEffect(() => {
+    //시간이 남아있지않거나 유저가 입력 후 애니메이션 중이라면 리턴
+    if (inputTimeLeft !== 0 || typingText !== '') return;
+
+    // 게임 종료 처리
+    setMessage('게임종료!');
+    setFrozenTime(timeLeft);
+    setRandomQuizWord();  // 다음 제시어 미리 준비
+    resetTimer();
+  }, [inputTimeLeft]);
+
+  // E5. 게임시작
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      //소켓에서 방장값 가져오기
+      const isOwner = socketParticipants.find(p => p.is_owner || p.is_creator)?.guest_id === guestStore.getState().guest_id;
+      //방장이면서 gameStatus가 준비중이면 5초뒤 게임 자동시작
+      if (isOwner && gameStatus === 'waiting') {
+        console.log("⏱️ [자동 시작] 5초 경과, 방장이므로 게임 시작 요청 보냄");
+        //소켓으로 게임시작 전송
+        requestStartWordChainGame("끝말잇기");
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+    //소켓값이 바뀌었을때 , 게임현재 상태가 변경되면 게임시작
+  }, [socketParticipants, gameStatus]);
+
+  //E6. 소켓종료
   useEffect(() => {
     return () => {
       const socket = getSocket();
@@ -567,7 +592,7 @@ useEffect(() => {
         typingText={typingText}
         handleTypingDone={handleTypingDone}
         quizMsg={quizMsg}
-        message={timeOver ? '시간 초과!' : message}
+        message={message}
         timeLeft={frozenTime ?? timeLeft}
         itemList={itemList}
         earnedItems={earnedItems}
@@ -578,56 +603,19 @@ useEffect(() => {
         setInputValue={setInputValue}
         crashKeyDown={crashKeyDown}
         crashMessage={crashMessage}
-        time_gauge={time_gauge}
         inputTimeLeft={inputTimeLeft}
         setInputTimeLeft={setInputTimeLeft}
+        showEndPointModal={showEndPointModal}
+        setShowEndPointModal={setShowEndPointModal}
         socketParticipants={socketParticipants}
-        finalResults={finalResults}
         usedLog={usedLog}
         reactionTimes={reactionTimes}
         handleClickFinish={handleClickFinish}
         frozenTime={frozenTime}
-        isPlaying={gameStatus === 'playing'}
-        isGameEnded={gameEnded}
-        gameid={gameid}
         currentTurnGuestId={currentTurnGuestId}
         myGuestId={guestStore.getState().guest_id}
         gameEnded={gameEnded}
       />
-      <div className="w-full max-w-md mx-auto mt-4 p-2 bg-gray-100 rounded-lg shadow">
-        <h2 className="text-center font-bold mb-2">📤 전송한 메시지</h2>
-        <div className="space-y-1 max-h-[200px] overflow-y-auto">
-          {itemList.length > 0 && (
-            <div className="p-4 rounded-2xl border shadow-lg bg-white border-gray-300 drop-shadow-md mx-auto">
-              <div className="flex items-center space-x-4 ml-2">
-                <div className="w-8 h-8 bg-blue-400 rounded-full"></div>
-                <span className="font-semibold text-lg text-black">
-                  {itemList[0].word.slice(0, -1)}
-                  <span className="text-red-500">{itemList[0].word.charAt(itemList[0].word.length - 1)}</span>
-                </span>
-              </div>
-              <div className="text-gray-500 text-sm ml-2 mt-2 break-words max-w-md text-left">
-                {itemList[0].desc}
-              </div>
-            </div>
-          )}
-          {/** 테스트용 턴넘기기 */}
-            {/** ---------------------------- */}
-          <button
-            onClick={() => {
-              const currentIdx = socketParticipants.findIndex(p => p.guest_id === currentTurnGuestId);
-              const nextIdx = (currentIdx + 1) % socketParticipants.length;
-              const nextTurnGuestId = socketParticipants[nextIdx].guest_id;
-              setCurrentTurnGuestId(nextTurnGuestId);
-              console.log("⏩ 강제로 턴 넘김 → 다음 guest_id:", nextTurnGuestId);
-            }}
-            className="fixed bottom-32 right-4 bg-purple-500 text-white px-4 py-2 rounded-lg shadow-md z-[999]"
-          >
-            다음 턴 넘기기 (테스트용)
-          </button>
-           {/** ---------------------------- */}
-        </div>
-      </div>
       {socketParticipants.length > 0 && guestStore.getState().guest_id === socketParticipants.find(p => p.is_owner || p.is_creator)?.guest_id && (
         <div className="fixed top-10 left-4 z-50 flex space-x-2">
           <button
@@ -635,14 +623,6 @@ useEffect(() => {
             className="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600 transition"
           >
             게임 시작
-          </button>
-          <button
-            onClick={() => {
-              requestSkipTurn();  // ✅ 소켓으로 턴 넘기기 요청
-            }}
-            className="bg-yellow-400 text-black px-4 py-2 rounded-lg shadow hover:bg-yellow-500 transition"
-          >
-            턴 넘기기
           </button>
         </div>
       )}
@@ -656,22 +636,7 @@ useEffect(() => {
           </button>
         </div>
       )}
-      {showEndPointModal && (
-        <div className="absolute top-0 left-0 w-full flex flex-col items-center justify-center z-50">
-          <EndPointModal
-            players={socketParticipants.length > 0 ? socketParticipants.map(p => p.nickname) : []}
-            onClose={() => setShowEndPointModal(false)}
-            usedLog={usedLog}
-            reactionTimes={reactionTimes}
-          />
-          <button
-            onClick={handleMoveToLobby}
-            className="mt-4 bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition"
-          >
-            로비로 이동
-          </button>
-        </div>
-      )}
+      {/* EndPointModal is rendered in Layout.js, do not render here to avoid overlap */}
     </>
   );
 }

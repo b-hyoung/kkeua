@@ -4,9 +4,9 @@ import { useEffect, useState, memo } from 'react';
 import TopMsgAni from './TopMsg_Ani';
 import Timer from './Timer';
 import msgData from './MsgData';
-import { workingCatImg } from '../../../Component/imgUrl';
+import { workingCatImg } from '../../../utils/imgUrl';
 import EndPointModal from './EndPointModal';
-import { gameLobbyUrl } from '../../../Component/urls';
+import { gameLobbyUrl } from '../../../utils/urls';
 
 function ProgressBar({ inputTimeLeft }) {
   return (
@@ -38,8 +38,9 @@ function Layout({
   message,
   itemList, // submitted word history
   earnedItems, // earned items
-  setItemList, // <-- 추가
   showCount,
+  showEndPointModal,
+  setShowEndPointModal,
   players,
   specialPlayer,
   inputValue,
@@ -49,15 +50,12 @@ function Layout({
   timeLeft, // Added timeLeft prop
   inputTimeLeft, // Added inputTimeLeft prop
   setInputTimeLeft,
-  setRandomQuizWord,
   setPendingItem, // Added setter here
   frozenTime, // add this line
   socketParticipants, // Added socketParticipants prop
-  finalResults, // Added finalResults prop
   usedLog, // Added usedLog prop
   reactionTimes, // Added reactionTimes prop
   handleClickFinish, // <-- Add this line
-  gameid, //gameid
   currentTurnGuestId, // Added currentTurnGuestId prop
   myGuestId, // Added myGuestId prop
   gameEnded // <-- add this line
@@ -73,7 +71,6 @@ function Layout({
     };
   }, []);
 
-  const [showEndPointModal, setShowEndPointModal] = useState(false);
   const [catRun, setCatRun] = useState(false);
 
   const randomWords = ['햄 스 터', '고 양 이', '강 아 지', '너 구 리', '사 자 상'];
@@ -232,19 +229,16 @@ function Layout({
         <div style={{ height: "70" }}></div>
         <br /><br /><br />
 
-        {showEndPointModal && (() => {
-
-          return (
-            <div className="absolute top-0 left-0 w-full flex justify-center items-center z-50">
-              <EndPointModal
-                players={(socketParticipants.length > 0 ? socketParticipants.map(p => p) : players)}
-                onClose={() => setShowEndPointModal(false)}
-                usedLog={usedLog}
-                reactionTimes={reactionTimes}
-              />
-            </div>
-          );
-        })()}
+        {showEndPointModal && (
+          <div className="absolute top-0 left-0 w-full flex justify-center items-center z-50">
+            <EndPointModal
+              players={socketParticipants.length > 0 ? socketParticipants.map(p => p) : players}
+              onClose={() => setShowEndPointModal(false)}
+              usedLog={usedLog}
+              reactionTimes={reactionTimes}
+            />
+          </div>
+        )}
 
         {/* 하단 입력창 */}
         <div className="w-full fixed bottom-0 bg-white z-50 border-t border-gray">

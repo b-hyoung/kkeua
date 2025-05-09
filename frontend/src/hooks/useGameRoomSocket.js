@@ -2,7 +2,7 @@ import React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import guestStore from '../store/guestStore';
 import { useNavigate } from 'react-router-dom';
-import { lobbyUrl } from '../Component/urls';
+import { lobbyUrl } from '../utils/urls';
 
 export const socketRef = React.createRef();
 

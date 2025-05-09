@@ -3,7 +3,7 @@ import Modal from 'react-modal';
 import './AddRoomModal.css';
 import axiosInstance from '../../../Api/axiosInstance';
 import { ROOM_API } from '../../../Api/roomApi';
-import { gameLobbyUrl, gameUrl } from '../../../Component/urls';
+import { gameLobbyUrl, gameUrl } from '../../../utils/urls';
 import { useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import guestStore from '../../../store/guestStore';

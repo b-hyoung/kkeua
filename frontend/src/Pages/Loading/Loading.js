@@ -4,12 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import LoadingButton from './LoadingButton';
 import TutoModal from './Modal/TutoModal';
 import axiosInstance from '../../Api/axiosInstance';
-import { lobbyUrl } from '../../Component/urls';
+import { lobbyUrl } from '../../utils/urls';
 import { USER_API } from '../../Api/userApi';
 import Cookies from 'js-cookie';
-import userIsTrue from '../../Component/userIsTrue';
+import userIsTrue from '../../utils/userIsTrue';
 import guestStore from '../../store/guestStore';
-import { logoImg } from '../../Component/imgUrl';
+import { logoImg } from '../../utils/imgUrl';
 
 function Loading() {
   console.log("Loading 컴포넌트 렌더링");
