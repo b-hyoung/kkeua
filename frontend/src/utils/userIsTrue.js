@@ -1,5 +1,5 @@
-import axiosInstance from '../Api/axiosInstance';
-import { USER_API } from '../Api/userApi';
+import axiosInstance from '../apis/axiosInstance';
+import { USER_API } from '../apis/userApi';
 import Cookies from 'js-cookie';
 
 async function userIsTrue() {

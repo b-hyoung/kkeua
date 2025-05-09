@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import axiosInstance from '../../Api/axiosInstance';
+import axiosInstance from '../../apis/axiosInstance';
 import { gameLobbyUrl, gameUrl, lobbyUrl } from '../../utils/urls';
 import userIsTrue from '../../utils/userIsTrue';
-import { ROOM_API } from '../../Api/roomApi';
+import { ROOM_API } from '../../apis/roomApi';
 import guestStore from '../../store/guestStore';
 import useGameRoomSocket from '../../hooks/useGameRoomSocket';
 

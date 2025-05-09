@@ -5,7 +5,7 @@ import TopMsgAni from './TopMsg_Ani';
 import Timer from './Timer';
 import msgData from './MsgData';
 import { workingCatImg } from '../../../utils/imgUrl';
-import EndPointModal from './EndPointModal';
+import EndPointModal from '../Modal/EndPointModal';
 import { gameLobbyUrl } from '../../../utils/urls';
 
 function ProgressBar({ inputTimeLeft }) {

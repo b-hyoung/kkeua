@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import './Lobby.css';
 import { gameLobbyUrl, /* gameUrl, */ lobbyUrl } from '../../utils/urls';
 import AddRoomModal from './Section/AddRoomModal';
-import axiosInstance from '../../Api/axiosInstance';
-import { ROOM_API } from '../../Api/roomApi';
+import axiosInstance from '../../apis/axiosInstance';
+import { ROOM_API } from '../../apis/roomApi';
 import guestStore from '../../store/guestStore'
 import userIsTrue from '../../utils/userIsTrue';
-import { USER_API } from '../../Api/userApi';
+import { USER_API } from '../../apis/userApi';
 import Cookies from 'js-cookie';
 import { addCatImg, refreshImg } from '../../utils/imgUrl';
 
