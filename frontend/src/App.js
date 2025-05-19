@@ -4,7 +4,6 @@ import Loading from './Pages/Loading/Loading';
 import InGame from './Pages/InGame/InGame';
 import Lobby from './Pages/Lobby/Lobby';
 import GameLobbyPage from './Pages/GameLobbyPage/GameLobbyPage';
-import { useEffect } from 'react';
 
 
 

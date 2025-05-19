@@ -8,3 +8,36 @@
     height: 118px;
     background-color: white;
 }
+
+@media screen and (max-width: 768px) {
+    .mobile-scroll-hide::-webkit-scrollbar {
+      display: none;
+    }
+    .mobile-scroll-hide {
+      -ms-overflow-style: none;  /* IE */
+      scrollbar-width: none;     /* Firefox */
+    }
+  }
+
+
+/* 스크롤바 전체 */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+/* 트랙 배경 */
+::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 4px;
+}
+
+/* 슬라이더 (움직이는 부분) */
+::-webkit-scrollbar-thumb {
+  background-color: #FFB366;
+}
+
+/* Firefox 대응 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #FFB366 #f0f0f0;
+}

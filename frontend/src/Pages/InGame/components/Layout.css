@@ -1,0 +1,26 @@
+@keyframes runCat {
+  0% {
+    transform: translateX(-100%) translateY(0) scale(2) rotate(-180deg);
+    opacity: 1;
+  }
+  20% {
+    transform: translateX(0%) translateY(0) scale(2) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: translateX(0%) translateY(0) scale(2.0) rotate(360deg);
+    opacity: 0.7;
+  }
+  70% {
+    transform: translateX(0%) translateY(0) scale(1.5) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(100%) translateY(0) scale(2) rotate(180deg);
+    opacity: 0.2;
+  }
+}
+
+.animate-runCat {
+  animation: runCat 2.5s ease-in-out forwards;
+}

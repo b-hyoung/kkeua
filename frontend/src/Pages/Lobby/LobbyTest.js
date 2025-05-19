@@ -11,7 +11,7 @@ import { USER_API } from '../../apis/userApi';
 import Cookies from 'js-cookie';
 import { addCatImg, refreshImg } from '../../utils/imgUrl';
 
-function Lobby() {
+function LobbyTest() {
   const navigate = useNavigate();
 
   const [activeIndex, setActiveIndex] = useState(0);
@@ -30,11 +30,6 @@ function Lobby() {
   const [isEntering, setIsEntering] = useState(false);
 
   const { uuid, nickname,guest_id } = guestStore.getState();
-  const [RoomFilter, setRoomFilter] = useState(false);
-
-  const guestProfileImg = nickname === '특정닉네임' 
-  ? '/imgs/gameBanner.png' 
-  : '/imgs/blogBanner.png';
 
   // 페이지 로드 시 게스트 정보 확인
   useEffect(() => {
@@ -76,7 +71,6 @@ function Lobby() {
 
   const fetchRoom = async () => {
     try {
-      setIsLoading(true);
       const res = await axiosInstance.get(ROOM_API.get_ROOMS);
 
       // API 응답 구조 확인 - rooms 배열에 접근
@@ -97,7 +91,6 @@ function Lobby() {
 
   const handleRandomEnter = async () => {
     try {
-      setIsLoading(true);
       await fetchRoom(); // 최신 데이터 요청
 
       const availableRooms = roomsData.filter(
@@ -111,7 +104,6 @@ function Lobby() {
       }
 
       const randomRoom = availableRooms[Math.floor(Math.random() * availableRooms.length)];
-      setIsEntering(true);
       setTimeout(() => {
         handleClickEnterGame(randomRoom.room_id);
       }, 700);
@@ -164,8 +156,6 @@ function Lobby() {
   // url 이동
   const handleClickEnterGame = async (room_id) => {
     try {
-      setIsEntering(true); // 입장 중 상태 설정
-      await new Promise((resolve) => setTimeout(resolve, 800)); // 살짝 딜레이 후 실제 입장
       await axiosInstance.post(ROOM_API.JOIN_ROOMS(room_id));
       navigate(gameLobbyUrl(room_id));
     } catch (err) {
@@ -207,9 +197,15 @@ function Lobby() {
     setActiveIndex(index);
     resetInterval(); // 클릭 시 인터벌 초기화
   }
-  //모달 열기
-  const handleClickOpenModal = () => {
-    setModalIsOpen(true)
+  //빠른 생성
+  const handleClickOpenModal = async () => {
+    const response = await axiosInstance.post(ROOM_API.CREATE_ROOMS, {
+        title: "개발자의 방",
+        max_players: 2,
+        game_mode: 'arcade',
+        time_limit: 120
+    });
+    navigate(gameLobbyUrl(response.data.room_id));
   }
   //Refresh BTN
   const handleClickRefresh = () => {
@@ -217,20 +213,9 @@ function Lobby() {
   }
 
   return (
-    <div className="w-full h-screen flex justify-center bg-[#F2F2F2]">
-      
-      <div className="hidden md:flex items-center justify-center mr-8 ml-8">
-        <a href="https://cokathtml.vercel.app/" target="_blank" rel="noopener noreferrer">
-          <img
-            src="/imgs/gameBanner.png"
-            alt="게임 배너"
-            className="w-32 h-auto object-contain hover:scale-105 transition-transform"
-          />
-        </a>
-      </div>
-      
-      
-      <div className="flex flex-col w-full max-w-4xl bg-[#ffffff] relative" style={{ boxShadow: '0px 0px 4px rgba(0, 0, 0, 0.3)'}}>
+    <div className="w-full h-screen flex justify-center bg-white">
+      <div className="hidden md:flex w-[12%] h-[70%] bg-gray-500 mr-12 self-center"></div>
+      <div className="flex flex-col w-full max-w-4xl bg-gray-200 shadow-lg relative">
         {isEntering && (
           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
             <div className="bg-white px-6 py-3 rounded-lg shadow-md text-gray-700 font-semibold text-lg">
@@ -240,18 +225,28 @@ function Lobby() {
         )}
         {/* 중앙 원형 이미지 + 게스트 아이디 */}
         <div className="w-full flex flex-col items-center mt-6 mb-2">
-          <img src={guestProfileImg} alt="게스트 프로필"
-            className="w-[50px] h-[50px] bg-white rounded-full object-cover mb-2 border border-gray-300"
+          <img
+
+            className="w-[50px] h-[50px] bg-white rounded-full object-cover mb-2"
           />
           <p className="text-lg font-semibold text-gray-700">{nickname || '게스트'}</p>
 
+
+          {/* 모바일: 스와이프 새로고침 안내 */}
+          <div className="md:hidden w-full flex justify-center py-2">
+            <span className="text-sm text-gray-500">위에서 아래로 스와이프 시 새로고침</span>
+          </div>
         </div>
-      
-        
-        {/* 상단 슬라이더 
-        
+        {/* 새로고침 안내 (게스트 닉네임 아래 중앙 정렬) */}
+        {!modalIsOpen && (
+          <div className="hidden md:flex justify-center items-center absolute bottom-[100px] left-1/2 transform -translate-x-1/2 z-50" onClick={handleClickRefresh}>
+            <div className="w-[50px] h-[50px] rounded-full flex items-center justify-center cursor-pointer bg-white shadow-md">
+              <img src={refreshImg} alt="새로고침 아이콘" className="w-6 h-6" />
+            </div>
+          </div>
+        )}
+        {/* 상단 슬라이더 */}
         {window.innerWidth < 768 && (
-          
           <div
             className="relative w-full h-[30vh] mt-5 flex items-center justify-center transition-all duration-500"
             style={{ backgroundColor: slides[activeIndex].color }} >
@@ -269,34 +264,13 @@ function Lobby() {
             </div>
           </div>
         )}
-        */}
-        
-        <div className="flex justify-end px-4 md:px-10 pb-5 mt-2 gap-3 items-center">
-
-        <button
-          className={`text-sm px-4 py-2 rounded-full border font-semibold ${RoomFilter ? 'bg-orange-300 text-white' : 'bg-white text-gray-600'}`}
-          onClick={() => setRoomFilter(prev => !prev)}
-        >
-          입장 가능
-        </button>
-
-
-          {/* 랜덤 입장 버튼 */}
+        <div className="flex justify-end px-4 md:px-10 mt-2">
           <button
-            className="text-white border border-[#595C86] bg-blue-500 hover:bg-blue-600 font-bold py-3 px-6 rounded-full shadow-md text-base"
+            className="text-white bg-blue-500 hover:bg-blue-600 font-bold py-3 px-6 rounded-full shadow-lg text-base"
             onClick={handleRandomEnter}
           >
             🎲 랜덤 입장
           </button>
-
-          {/* 새로고침 버튼 */}
-          <div
-            className="w-[44px] h-[44px] rounded-full flex items-center justify-center cursor-pointer bg-white border border-gray-300 shadow-sm"
-            onClick={handleClickRefresh}
-          >
-            <img src={refreshImg} alt="새로고침 아이콘" className="w-5 h-5" />
-          </div>
-
         </div>
         {/* 방 목록 */}
         {roomsData.length === 0 || !roomsData[0] || roomsData[0].title === "" ? (
@@ -308,33 +282,13 @@ function Lobby() {
           </>
         ) : null}
         {roomsData.length > 0 && roomsData[0].title !== "" && (
-          <div className="flex-1 overflow-y-auto bg-gray-50 md:pt-16 text-left space-y-4 px-2 md:px-10 pb-24 mobile-scroll-hide">
-          {(RoomFilter
-            ? [...roomsData].sort((a, b) => {
-                const aAvailable = a.status === "waiting" && a.participant_count < a.max_players;
-                const bAvailable = b.status === "waiting" && b.participant_count < b.max_players;
-                return bAvailable - aAvailable; // 입장 가능 방 먼저
-              })
-            : roomsData
-          ).map((room, index) => (
-            /* 게임리스트 컨테이너 조건부 박스 색상 */
-            <div
-             key={room.room_id || index}
-             className="rounded-xl p-4 md:p-8 min-h-[12vh] md:min-h-[16vh] border-b flex items-center justify-between"
-             style={{
-               backgroundColor:
-                 room.status === 'waiting'
-                   ? (room.participant_count < room.max_players ? '#FFF5ED' : '#EDEDED')
-                   : '#EDEDED',
-               boxShadow: '2px 2px 3px rgba(0, 0, 0, 0.2)',
-             }}
-           >           
-
+          <div className="flex-1 overflow-y-auto text-left space-y-4 px-2 md:px-10 md:pt-16 pb-24">
+            {roomsData.map((room, index) => (
+              <div key={room.room_id || index} className="bg-white p-4 md:p-8 min-h-[12vh] md:min-h-[16vh] border-b shadow-md md:shadow-lg flex items-center justify-between">
                 <div>
                   <h3 className="font-bold mb-0.5 tracking-widest text-lg md:text-xl">{room?.title || '제목 없음'}</h3>
                   <p className="text-sm md:text-lg font-bold">{room?.game_mode || '알 수 없음'} [ {room?.participant_count || 0} / {room?.max_players || 0} ]</p>
                 </div>
-                { /* 게임리스트 버튼 조건부 색상 */ }
                 {room.status === 'waiting' ? (
                   room.participant_count >= room.max_players ? (
                     <button className="text-white px-3 py-1 rounded bg-gray-500 cursor-not-allowed" disabled>
@@ -342,7 +296,7 @@ function Lobby() {
                     </button>
                   ) : (
                     <button
-                      className="text-white px-3 py-1 rounded bg-[#FF9234] hover:bg-[#FF7676]"
+                      className="text-white px-3 py-1 rounded bg-red-500 hover:bg-red-600"
                       onClick={async () => {
                         try {
                           // 최신 방 데이터 가져오기
@@ -399,37 +353,23 @@ function Lobby() {
         )}
 
         {/* 모바일: 방 생성하기 버튼 */}
-        {!modalIsOpen && (
-          <button
-            className="w-[280px] h-[48px] flex items-center justify-center gap-2 text-red-400 border-2 rounded-full px-4 py-2 bg-white z-10 fixed bottom-4 left-1/2 transform -translate-x-1/2"
-            style={{ boxShadow: '2px 2px 3px rgba(0, 0, 0, 0.2)' }}
-            onClick={handleClickOpenModal}
-          >
+        <div className="w-full flex justify-center py-4 bg-gray-200 border-gray-300 relative" onClick={(e) => handleClickOpenModal(e)} >
+          <button className="w-full md:w-[80%] flex items-center justify-center gap-2 text-red-400 border-2 border-[#4178ED] rounded-full px-4 py-2 shadow-lg bg-white">
             <img src={addCatImg} className="w-8 h-8" />
             방 생성하기
           </button>
-        )}
+        </div>
 
-        {/* 모달 */}
-        {modalIsOpen && (
-          <AddRoomModal isOpen={modalIsOpen} isClose={setModalIsOpen} />
-        )}
-
+        {
+          modalIsOpen &&
+          <>
+            <AddRoomModal isOpen={modalIsOpen} isClose={setModalIsOpen} />
+          </>
+        }
       </div >
-      
-    <div className="hidden md:flex items-center justify-center mr-8 ml-8">
-      <a href="https://blog.naver.com/catoo_4" target="_blank" rel="noopener noreferrer">
-        <img
-          src="/imgs/blogBanner.png"
-          alt="블로그 배너"
-          className="w-32 h-auto object-contain hover:scale-105 transition-transform"
-        />
-      </a>
-    </div>
-
-        
+      <div className="hidden md:flex w-[12%] h-[70%] bg-gray-500 ml-12 self-center"></div>
     </div >
   );
 }
 
-export default Lobby;
+export default LobbyTest;

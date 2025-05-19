@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import Modal from 'react-modal';
 import './AddRoomModal.css';
-import axiosInstance from '../../../Api/axiosInstance';
-import { ROOM_API } from '../../../Api/roomApi';
-import { gameLobbyUrl, gameUrl } from '../../../Component/urls';
+import axiosInstance from '../../../apis/axiosInstance';
+import { ROOM_API } from '../../../apis/roomApi';
+import { gameLobbyUrl, gameUrl } from '../../../utils/urls';
 import { useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
 import guestStore from '../../../store/guestStore';
@@ -31,7 +31,7 @@ function AddRoomModal({ isOpen, isClose }) {
         }
 
         try {
-            console.log("방 생성 요청 경로:", ROOM_API.CREATE_ROOM);
+            console.log("방 생성 요청 경로:", ROOM_API.CREATE_ROOMS);
             console.log("전송 데이터:", {
                 title: roomTitle,
                 max_players: maxPlayers,
@@ -39,7 +39,7 @@ function AddRoomModal({ isOpen, isClose }) {
                 time_limit: timeLimit
             });
 
-            const response = await axiosInstance.post('/gamerooms/', {
+            const response = await axiosInstance.post(ROOM_API.CREATE_ROOMS, {
                 title: roomTitle,
                 max_players: maxPlayers,
                 game_mode: gameMode,

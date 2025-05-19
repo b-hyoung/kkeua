@@ -81,9 +81,33 @@ class GameroomService:
         """게임룸 정보를 업데이트합니다."""
         return self.repository.update(room_id, data)
         
-    def delete_gameroom(self, room_id: int) -> bool:
-        """게임룸을 삭제합니다."""
-        return self.repository.delete(room_id)
+    def delete_gameroom(self, room_id: int, guest_id: int = None) -> bool:
+        """
+        게임룸을 삭제합니다.
+        삭제 시 모든 참가자의 상태도 'LEFT'로 변경합니다.
+        """
+        try:
+            # 게임룸 조회
+            room = self.repository.find_by_id(room_id)
+            if not room:
+                return False
+            
+            # 요청자가 방장인지 확인 (guest_id가 제공된 경우)
+            if guest_id is not None and room.created_by != guest_id:
+                return False
+            
+            # 모든 참가자 퇴장 처리
+            self.repository.remove_all_participants(room_id)
+            
+            # 게임룸 상태 변경
+            success = self.repository.delete_gameroom(room_id)
+            
+            return success
+        except Exception as e:
+            print(f"게임룸 삭제 오류: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False
     
     def join_gameroom(self, room_id: int, guest_id: int) -> Optional[GameroomParticipant]:
         """게임룸에 참가합니다."""

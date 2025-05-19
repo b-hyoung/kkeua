@@ -3,12 +3,13 @@ import './Loading.css';
 import { useNavigate } from 'react-router-dom';
 import LoadingButton from './LoadingButton';
 import TutoModal from './Modal/TutoModal';
-import axiosInstance from '../../Api/axiosInstance';
-import { lobbyUrl } from '../../Component/urls';
-import { USER_API } from '../../Api/userApi';
+import axiosInstance from '../../apis/axiosInstance';
+import { lobbyUrl } from '../../utils/urls';
+import { USER_API } from '../../apis/userApi';
 import Cookies from 'js-cookie';
-import userIsTrue from '../../Component/userIsTrue';
+import userIsTrue from '../../utils/userIsTrue';
 import guestStore from '../../store/guestStore';
+import { logoImg } from '../../utils/imgUrl';
 
 function Loading() {
   console.log("Loading 컴포넌트 렌더링");
@@ -120,7 +121,7 @@ function Loading() {
           <a className='text-[#0088CC]'>이드</a>
         </div>
 
-        <img src='/imgs/logo/kkeua_logo.png' className="mx-auto mt-5 w-[40%]"></img>
+        <img src={logoImg} className="mx-auto mt-5 w-[40%]"></img>
         <LoadingButton onClick={startButtonOn} id="Loading__button--startbutton" text="시작하기"></LoadingButton><br></br>
         <LoadingButton onClick={backButtonOn} id="Loading__button--backbutton" text="뒤로가기"></LoadingButton>
       </div>

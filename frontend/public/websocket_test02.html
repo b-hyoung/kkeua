@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>웹소켓 테스트</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .left-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .right-panel {
+            width: 300px;
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        
+        h2 {
+            color: #555;
+            font-size: 1.2rem;
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        
+        .status {
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+        
+        .status.connected {
+            background-color: #dff2bf;
+            color: #4f8a10;
+        }
+        
+        .status.disconnected {
+            background-color: #ffbaba;
+            color: #d8000c;
+        }
+        
+        .status.connecting {
+            background-color: #feefb3;
+            color: #9f6000;
+        }
+        
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        button.secondary {
+            background-color: #2196F3;
+        }
+        
+        button.secondary:hover {
+            background-color: #0b7dda;
+        }
+        
+        button.danger {
+            background-color: #f44336;
+        }
+        
+        button.danger:hover {
+            background-color: #d32f2f;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .chat-container {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            background-color: #fafafa;
+            margin-bottom: 10px;
+        }
+        
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        
+        .message.system {
+            background-color: #f1f1f1;
+            color: #555;
+            width: 100%;
+            max-width: 100%;
+            text-align: center;
+            font-style: italic;
+            padding: 5px;
+        }
+        
+        .message.received {
+            background-color: #E3F2FD;
+            color: #0D47A1;
+            align-self: flex-start;
+            margin-right: auto;
+        }
+        
+        .message.sent {
+            background-color: #E8F5E9;
+            color: #1B5E20;
+            align-self: flex-end;
+            margin-left: auto;
+            text-align: right;
+        }
+        
+        .message-header {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .message-time {
+            font-size: 0.8em;
+            color: #777;
+            display: block;
+            margin-top: 5px;
+        }
+        
+        .chat-messages {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-form {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-form input {
+            flex: 1;
+            margin-top: 0;
+        }
+        
+        .chat-form button {
+            margin-top: 0;
+        }
+        
+        .user-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .user-list li {
+            padding: 8px 10px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            background-color: #f9f9f9;
+        }
+        
+        .user-list li.current-user {
+            background-color: #E3F2FD;
+            font-weight: bold;
+        }
+        
+        .event-log {
+            height: 200px;
+            overflow-y: auto;
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.9em;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+            line-height: 1.4;
+        }
+        
+        .log-entry.error {
+            color: #d8000c;
+        }
+        
+        .log-entry.warning {
+            color: #9f6000;
+        }
+        
+        .log-entry.info {
+            color: #00529B;
+        }
+        
+        .log-entry.success {
+            color: #4f8a10;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .right-panel {
+                width: auto;
+                order: 1;
+                margin-bottom: 20px;
+            }
+            
+            .left-panel {
+                order: 2;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>웹소켓 테스트 페이지</h1>
+    
+    <div class="card">
+        <h2>연결 상태</h2>
+        <div id="connectionStatus" class="status disconnected">연결 끊김</div>
+        <div>
+            <button id="connectBtn">연결하기</button>
+            <button id="disconnectBtn" disabled>연결 끊기</button>
+            <button id="pingBtn" disabled class="secondary">Ping 보내기</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="left-panel">
+            <div class="card">
+                <h2>채팅</h2>
+                <div class="chat-container">
+                    <div id="chatMessages" class="chat-messages"></div>
+                </div>
+                <div class="chat-form">
+                    <input type="text" id="messageInput" placeholder="메시지 입력..." disabled>
+                    <button id="sendBtn" disabled>전송</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>사용자 설정</h2>
+                <div>
+                    <label for="nicknameInput">사용자 이름:</label>
+                    <input type="text" id="nicknameInput" placeholder="변경할 닉네임 입력" disabled>
+                    <button id="setNicknameBtn" disabled>닉네임 설정</button>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>이벤트 로그</h2>
+                <div id="eventLog" class="event-log"></div>
+            </div>
+        </div>
+        
+        <div class="right-panel">
+            <h2>접속자 목록</h2>
+            <ul id="userList" class="user-list">
+                <li>접속자가 없습니다</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        // 요소 참조
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const pingBtn = document.getElementById('pingBtn');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const chatMessages = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const userList = document.getElementById('userList');
+        const nicknameInput = document.getElementById('nicknameInput');
+        const setNicknameBtn = document.getElementById('setNicknameBtn');
+        const eventLog = document.getElementById('eventLog');
+        
+        // 웹소켓 객체
+        let socket = null;
+        let clientId = null;
+        let currentUsername = null;
+        
+        // 버튼 이벤트 리스너
+        connectBtn.addEventListener('click', connectWebSocket);
+        disconnectBtn.addEventListener('click', disconnectWebSocket);
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+        pingBtn.addEventListener('click', sendPing);
+        setNicknameBtn.addEventListener('click', setNickname);
+        
+        // 웹소켓 연결 함수
+        function connectWebSocket() {
+            updateConnectionStatus('connecting', '연결 중...');
+            
+            // 현재 페이지 URL에서 웹소켓 URL 생성
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${location.host}/simple-ws/ws`;
+            
+            // 로그 추가
+            addToEventLog('info', `웹소켓 연결 시도: ${wsUrl}`);
+            
+            try {
+                socket = new WebSocket(wsUrl);
+                
+                // 웹소켓 이벤트 핸들러
+                socket.onopen = handleSocketOpen;
+                socket.onmessage = handleSocketMessage;
+                socket.onclose = handleSocketClose;
+                socket.onerror = handleSocketError;
+                
+            } catch (error) {
+                addToEventLog('error', `웹소켓 연결 오류: ${error.message}`);
+                updateConnectionStatus('disconnected', '연결 실패');
+            }
+        }
+        
+        // 웹소켓 연결 끊기
+        function disconnectWebSocket() {
+            if (socket) {
+                addToEventLog('info', '웹소켓 연결 종료 중...');
+                socket.close();
+            }
+        }
+        
+        // 메시지 전송
+        function sendMessage() {
+            if (!socket || socket.readyState !== WebSocket.OPEN || !messageInput.value.trim()) {
+                return;
+            }
+
+            const payload = {
+                action: "submit_word",           // 행동 구분
+                user: currentUsername || "게스트", // 닉네임 설정한 사용자 (없으면 게스트)
+                current_word: messageInput.value.trim(), // 입력한 단어
+                itemUsed: false                  // (아이템 사용 여부, 기본 false)
+            };
+
+            socket.send(JSON.stringify(payload));
+            addToEventLog('info', `단어 전송: ${JSON.stringify(payload)}`);
+
+            messageInput.value = ''; // 입력창 비우기
+        }
+        
+        // 닉네임 설정
+        function setNickname() {
+            if (!socket || socket.readyState !== WebSocket.OPEN || !nicknameInput.value.trim()) {
+                return;
+            }
+
+            const newNickname = nicknameInput.value.trim();
+            const message = {
+                type: 'set_username',
+                username: newNickname
+            };
+
+            socket.send(JSON.stringify(message));
+            addToEventLog('info', `닉네임 변경 요청: ${newNickname}`);
+
+            currentUsername = newNickname; // <<< 추가해야 함 (닉네임 저장!)
+            nicknameInput.value = '';
+        }
+        
+        // 웹소켓 오픈 핸들러
+        function handleSocketOpen(event) {
+            addToEventLog('success', '웹소켓 연결 성공');
+            updateConnectionStatus('connected', '연결됨');
+            
+            // 버튼 상태 업데이트
+            connectBtn.disabled = true;
+            disconnectBtn.disabled = false;
+            pingBtn.disabled = false;
+            messageInput.disabled = false;
+            sendBtn.disabled = false;
+            nicknameInput.disabled = false;
+            setNicknameBtn.disabled = false;
+        }
+        
+        // 웹소켓 메시지 핸들러
+        function handleSocketMessage(event) {
+            try {
+                const data = JSON.parse(event.data);
+                addToEventLog('info', `메시지 수신: ${JSON.stringify(data)}`);
+                
+                // 메시지 타입에 따른 처리
+                switch (data.type) {
+                    case 'connected':
+                        handleConnectedMessage(data);
+                        break;
+                        case 'chat':
+                        handleChatMessage(data);
+                        //addToEventLog('success', `단어 수신: ${data.word} (by ${data.user})`);
+                        break;
+                    case 'user_joined':
+                        handleUserJoinedMessage(data);
+                        break;
+                    case 'user_left':
+                        handleUserLeftMessage(data);
+                        break;
+                    case 'username_changed':
+                        handleUsernameChangedMessage(data);
+                        break;
+                    case 'pong':
+                        handlePongMessage(data);
+                        break;
+                    default:
+                        addToEventLog('warning', `알 수 없는 메시지 타입: ${data.type}`);
+                }
+                
+            } catch (error) {
+                addToEventLog('error', `메시지 처리 오류: ${error.message}`);
+            }
+        }
+        
+        // 연결 성공 메시지 처리
+        function handleConnectedMessage(data) {
+            clientId = data.client_id;
+            addSystemMessage(`${data.message}`);
+        }
+        
+        // 채팅 메시지 처리
+        function handleChatMessage(data) {
+            const isMine = data.client_id === clientId;
+            const messageClass = isMine ? 'sent' : 'received';
+            
+            const messageEl = document.createElement('div');
+            messageEl.className = `message ${messageClass}`;
+            
+            const headerEl = document.createElement('div');
+            headerEl.className = 'message-header';
+            headerEl.textContent = isMine ? '나' : data.username;
+            messageEl.appendChild(headerEl);
+            
+            const contentEl = document.createElement('div');
+            contentEl.textContent = data.message;
+            messageEl.appendChild(contentEl);
+            
+            const timeEl = document.createElement('div');
+            timeEl.className = 'message-time';
+            timeEl.textContent = formatTimestamp(data.timestamp);
+            messageEl.appendChild(timeEl);
+            
+            chatMessages.appendChild(messageEl);
+            scrollToBottom();
+        }
+        
+        // 사용자 입장 메시지 처리
+        function handleUserJoinedMessage(data) {
+            addSystemMessage(`${data.message}`);
+            updateUsersList(data.users);
+        }
+        
+        // 사용자 퇴장 메시지 처리
+        function handleUserLeftMessage(data) {
+            addSystemMessage(`${data.message}`);
+            updateUsersList(data.users);
+        }
+        
+        // 사용자 이름 변경 메시지 처리
+        function handleUsernameChangedMessage(data) {
+            addSystemMessage(`${data.message}`);
+            
+            // 내 이름이 변경된 경우
+            if (data.client_id === clientId) {
+                currentUsername = data.new_username;
+            }
+            
+            updateUsersList(data.users);
+        }
+        
+        // Pong 메시지 처리
+        function handlePongMessage(data) {
+            const now = new Date();
+            const sentTime = new Date(data.timestamp);
+            const latency = now - sentTime;
+            
+            addSystemMessage(`Pong 수신! 지연 시간: ${latency}ms`);
+        }
+        
+        // 웹소켓 종료 핸들러
+        function handleSocketClose(event) {
+            addToEventLog('warning', `웹소켓 연결 종료: 코드=${event.code}, 이유=${event.reason || '없음'}`);
+            updateConnectionStatus('disconnected', '연결 끊김');
+            
+            // 리소스 정리
+            socket = null;
+            clientId = null;
+            
+            // 버튼 상태 업데이트
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            pingBtn.disabled = true;
+            messageInput.disabled = true;
+            sendBtn.disabled = true;
+            nicknameInput.disabled = true;
+            setNicknameBtn.disabled = true;
+            
+            // 사용자 목록 초기화
+            userList.innerHTML = '<li>접속자가 없습니다</li>';
+        }
+        
+        // 웹소켓 오류 핸들러
+        function handleSocketError(error) {
+            addToEventLog('error', `웹소켓 오류: ${error.message || JSON.stringify(error)}`);
+        }
+        
+        // 시스템 메시지 추가
+        function addSystemMessage(text) {
+            const messageEl = document.createElement('div');
+            messageEl.className = 'message system';
+            messageEl.textContent = text;
+            
+            chatMessages.appendChild(messageEl);
+            scrollToBottom();
+        }
+        
+        // 채팅창 스크롤을 항상 아래로
+        function scrollToBottom() {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // 연결 상태 업데이트
+        function updateConnectionStatus(state, text) {
+            connectionStatus.className = `status ${state}`;
+            connectionStatus.textContent = text;
+        }
+        
+        // 이벤트 로그 추가
+        function addToEventLog(level, text) {
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${level}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            logEntry.textContent = `[${timestamp}] ${text}`;
+            
+            eventLog.appendChild(logEntry);
+            eventLog.scrollTop = eventLog.scrollHeight;
+        }
+        
+        // 사용자 목록 업데이트
+        function updateUsersList(users) {
+            userList.innerHTML = '';
+            
+            if (!users || users.length === 0) {
+                const noUsersEl = document.createElement('li');
+                noUsersEl.textContent = '접속자가 없습니다';
+                userList.appendChild(noUsersEl);
+                return;
+            }
+            
+            users.forEach(user => {
+                const userEl = document.createElement('li');
+                userEl.textContent = `${user.username}`;
+                
+                if (user.client_id === clientId) {
+                    userEl.classList.add('current-user');
+                    userEl.textContent += ' (나)';
+                }
+                
+                userList.appendChild(userEl);
+            });
+        }
+        
+        // 타임스탬프 포맷팅
+        function formatTimestamp(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString();
+        }
+    </script>
+</body>
+</html> 
